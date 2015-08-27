@@ -56,11 +56,12 @@ xdata <- dataset
 nopy <- length(dataset)/yrs
 
 
-zz <- gpd.fit( xdat=xdata, threshold=thres, npy=nopy,
-ydat=covs, sigl=sig.cov.cols, siglink=sig.linker, shl=gam.cov.cols,
-shlink=gam.linker, method="BFGS", maxit=10000, show=FALSE)
+zz <- gpd.fit(xdat=xdata, threshold=thres, npy=nopy,
+              ydat=covs, sigl=sig.cov.cols, siglink=sig.linker, 
+              shl=gam.cov.cols, shlink=gam.linker, 
+              method="BFGS", maxit=10000, show=FALSE)
 
-#Calculate confidence intervals CI using the Profile likelihood method:
+# Calculate confidence intervals CI using the Profile likelihood method:
 CI_low <- c()
 CI_up <- c()
 zh <- c()
@@ -69,7 +70,7 @@ for(i in 1:mxnp){
            rl.xup=NULL, rl.xlow=NULL, xi.xup=NULL,  xi.xlow=NULL, make.plot=FALSE)
      CI_low[i] <- confInt$rl$dn
      CI_up[i] <- confInt$rl$up
-     #Calculate corresponding return period for point RP[i]:
+     # Calculate corresponding return period for point RP[i]:
      zh[i] <- confInt$rl$mle
 }
 #Plot RP with confidence interval:
@@ -78,11 +79,13 @@ if(plotRP){
     tit1 <- ""
     #tit1 <- try(titulo,silent=T)   #titulo is defined in shell
     ymax<-10*(ceiling(CI_up[mxnp]/10))
-    plotGPD_CI(RP,zh,log="x",type="l",ylab="speed (m/s)",xlab="Return Period (yrs)",xlim=c(10,10000),ylim=c(10,ymax),main=tit1)
+    plotGPD_CI(RP, zh, log="x", type="l", ylab="speed (m/s)", 
+               xlab="Return Period (yrs)", xlim=c(10,10000),
+               ylim=c(10,ymax),main=tit1)
     lines(cbind(RP,CI_low),lty=2,col="blue")
     lines(cbind(RP,CI_up),lty=2,col="blue")
     #text(60,65,"Return Period using a GPD distribution")
-    grid(NULL,NULL)
+    grid(NULL, NULL)
     #If actual return periods in same plot are required change to TRUE:
     include_actualRP <- FALSE
     if(plotObs){
@@ -95,7 +98,7 @@ if(plotRP){
     }
 }
 
-cbind(RP,CI_low,zh,CI_up)
+cbind(RP, CI_low, zh,CI_up)
 }
 
 

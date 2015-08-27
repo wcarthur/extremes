@@ -48,6 +48,10 @@ paramCI = function (z, m, conf = 0.95, nint = 100, rl.xup = NULL, rl.xlow = NULL
         mat <- matrix(c((la * (1 - la))/z$n, 0, 0, 0, mat[1,
             1], mat[1, 2], 0, mat[2, 1], mat[2, 2]), nc = 3)
         vv <- apply(d, 1, q.form, m = mat)
+        if (vv == 0){
+          l <- 0
+          l
+        }
         if (est.rl.xlow)
             rl.xlow <- rl.mle - 1.5 * qnorm((1 - conf)/2, lower.tail = FALSE) *
                 sqrt(vv)

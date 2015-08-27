@@ -30,7 +30,7 @@ select_threshold = function(data,yrs,init=0,resol=-1,last=-1){
   
   #Required:
   source(paste(sdir,"GPD_distr.r",sep=""))
-  #source(paste(sdir,"my_Rplot.r",sep=""))
+  source(paste(sdir,"my_Rplot.r",sep=""))
   source(paste(sdir,"calc_qsh.r",sep=""))
   source(paste(sdir,"closest_u.r",sep=""))
   
@@ -63,7 +63,7 @@ select_threshold = function(data,yrs,init=0,resol=-1,last=-1){
     noveru <- length(data[data > u])
     #print(paste("N over u = ",toString(noveru),sep=""))
     
-    if(noveru < 20) {
+    if(noveru < 10) {
       break
     }
     if(last > 0 & u > last){
@@ -97,7 +97,7 @@ select_threshold = function(data,yrs,init=0,resol=-1,last=-1){
     #print(cbind(u,sh1,sh2) )
     qdiff <- abs(q10000 - q1000)
     #print(paste("qdiff = ",toString(qdiff),sep=""))
-    feasible <- !is.na(q1000) & !is.na(q10000) & sh1 < eps  & sh2 < eps & qdiff < 0.12*q10000
+    feasible <- !is.na(q1000) & !is.na(q10000) & sh1 < eps  & sh2 < eps #& qdiff < 0.2*q10000
     if(feasible){
       #print(paste("Feasible (stored): u = ", toString(thresh), sep="")  )
       count <- count + 1
@@ -118,6 +118,10 @@ select_threshold = function(data,yrs,init=0,resol=-1,last=-1){
   #print(paste("q1000_vec = ",toString(q1000_vec),sep=""))
   q1000_vec <- q1000_vec[!is.na(q1000_vec)]
   q10000_vec <- q10000_vec[!is.na(q10000_vec)]
+  
+  if (length(q10000_vec) == 0) {
+    return (cbind(c(0), c(0), c(0)))
+  }
   
   u_vec <- u_vec[!is.na(u_vec)]
   
