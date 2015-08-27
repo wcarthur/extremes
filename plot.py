@@ -95,7 +95,7 @@ def plotDiagnostics(data, mu, xi, sigma, figfile):
     fig, ax = plt.subplots(2, 2)
     axes = ax.flatten()
     # Probability plots
-    sortedmax = np.sort(data[data > mu])   
+    sortedmax = np.sort(data[data > mu])
     gpdf = fittedPDF(data, mu, xi, sigma)
     pp_x = sm.ProbPlot(sortedmax)
     pp_x.ppplot(xlabel="Empirical", ylabel="Model", ax=axes[0], line='45')

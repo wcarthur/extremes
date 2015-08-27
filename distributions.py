@@ -52,7 +52,7 @@ def fittedPDF(data, mu, sigma, xi):
     """
 
     LOG.debug("Calculating fitted GPD PDF")
-    res = genpareto.pdf(np.sort(data[data > mu]), 
+    res = genpareto.pdf(np.sort(data[data > mu]),
                         sigma, loc=mu, scale=xi)
 
     return res

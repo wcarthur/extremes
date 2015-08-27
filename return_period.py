@@ -65,6 +65,7 @@ def empiricalReturnPeriod(data, npyr=OBS_PER_YEAR):
     emprp = 1. / (1. - np.arange(1, nobs + 1, 1) / (nobs + 1)) / npyr
     return emprp
 
+
 def returnPeriodUncertainty(data, mu, xi, sigma, intervals):
     """
     Calculate uncertainty around a fit, holding threshold fixed
@@ -85,13 +86,13 @@ def returnPeriodUncertainty(data, mu, xi, sigma, intervals):
     """
     sortedmax = np.sort(data[data > mu])
     nobs = len(sortedmax)
-    rate = float(nobs)/float(len(data))
+    rate = float(nobs) / float(len(data))
     emppdf = empiricalPDF(data[data > mu])
 
     # Perform the curve fitting, holding ``mu`` fixed and allowing
     # ``xi`` and ``sigma`` to vary.
     try:
-        popt, pcov = curve_fit(lambda x, xi, sigma: \
+        popt, pcov = curve_fit(lambda x, xi, sigma:
                                genpareto.pdf(x, xi, loc=mu, scale=sigma),
                                sortedmax, emppdf, (xi, sigma))
     except RuntimeError as e:
