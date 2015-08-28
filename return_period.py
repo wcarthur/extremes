@@ -30,7 +30,7 @@ def returnLevels(intervals, mu, xi, sigma, rate, npyr=OBS_PER_YEAR):
     :param intervals: :class:`numpy.ndarray` or float of return period intervals
               to evaluate return levels for.
     :param float mu: Threshold parameter (also called location).
-    :param float chi: Shape parameter.
+    :param float xi: Shape parameter.
     :param float sigma: Scale parameter.
     :param float rate: Rate of exceedances (i.e. number of observations greater
                        than `mu`, divided by total number of observations).
@@ -73,7 +73,7 @@ def returnPeriodUncertainty(data, mu, xi, sigma, intervals):
     :param data: :class:`numpy.ndarray` containing the observed values (with
                  missing values removed).
     :param float mu: Threshold parameter (also called location).
-    :param float chi: Shape parameter.
+    :param float xi: Shape parameter.
     :param float sigma: Scale parameter.
     :param intervals: :class:`numpy.ndarray` or float of return period intervals
               to evaluate return level uncertainties for. 
