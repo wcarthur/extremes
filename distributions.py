@@ -37,15 +37,15 @@ def empiricalPDF(data):
     return res
 
 
-def fittedPDF(data, mu, sigma, xi):
+def fittedPDF(data, mu, xi, sigma):
     """
     Calculate probability denisty function values given data and
     GPD fit parameters.
 
     :param data: :class:`numpy.ndarray` of data values.
     :param float mu: Location parameter of the fitted GPD.
-    :param float sigma: Shape parameter of the fitted GPD.
-    :param float xi: Scale parameter of the fitted GPD.
+    :param float xi: Shape parameter of the fitted GPD.
+    :param float sigma: Scale parameter of the fitted GPD.
 
     :returns: :class:`numpy.ndarray` of PDF values at the data points.
 
@@ -53,20 +53,22 @@ def fittedPDF(data, mu, sigma, xi):
 
     LOG.debug("Calculating fitted GPD PDF")
     res = genpareto.pdf(np.sort(data[data > mu]),
-                        sigma, loc=mu, scale=xi)
+                        xi, loc=mu, scale=sigma)
 
     return res
 
 
-def generateDistributions(data, mu, sigma, xi):
+def generateDistributions(data, mu, xi, sigma):
     """
     Generate empirical and fitted PDF values for selected data, based on
     threshold, shape and scale parameters.
 
     :param data: :class:`numpy.ndarray` of data values.
     :param float mu: Location parameter of the fitted GPD.
-    :param float sigma: Shape parameter of the fitted GPD.
-    :param float xi: Scale parameter of the fitted GPD.
+    :param float xi: Shape parameter of the fitted GPD.
+    :param float sigma: Scale parameter of the fitted GPD.
+
+    :raises ValueError: If mu > max(data).
 
     """
 
@@ -74,6 +76,28 @@ def generateDistributions(data, mu, sigma, xi):
         raise ValueError("Threshold greater than maximum data value")
 
     emppdf = empiricalPDF(data[data > mu], mu)
-    gpdf = fittedPDF(data, mu, sigma, xi)
+    gpdf = fittedPDF(data, mu, xi, sigma)
 
     return emppdf, gpdf
+
+def asymptote(mu, xi, sigma):
+    """
+    Calculate the limiting value of a (bounded) GPD, based on the fitted
+    values of mu, sigma and xi (as demonstrated in Coles,2001). Note xi is
+    negative, so we take the absolute value of the relation.
+
+    :param float mu: Location parameter of the fitted GPD.
+    :param float xi: Shape parameter of the fitted GPD.
+    :param float sigma: Scale parameter of the fitted GPD.
+
+    :returns: asymptote value
+    :rtype: float
+
+    :raises ValueError: If sigma >= 0, which defines an unbounded GPD.
+    """
+
+    if sigma >= 0.0:
+        raise ValueError("Shape parameter value defines unbounded distribution")
+    limit = np.abs((mu - xi) / sigma)
+
+    return limit
