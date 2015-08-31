@@ -2,21 +2,26 @@ from __future__ import division
 
 import pandas as pd
 import numpy as np
-import logging
+import logging as log
 from functools import wraps
 import time
 import os
+import sys
+import argparse
+import traceback
 
-from os.path import join as pjoin
+from os.path import join as pjoin, realpath, isdir, dirname, exists
 from datetime import datetime
 from scipy.stats import genpareto
 
 
 from plot import plotDiagnostics, plotFit
 from return_period import returnLevels
-from Utilities.files import flStartLog
+from Utilities.files import flStartLog, flConfigFile
+from Utilities.metutils import convert
+from Utilities.config import ConfigParser
 
-CONVERTERS = {'Speed': lambda s: float(s or 0) / 3.6}
+CONVERTERS = {'Speed': lambda s: convert((float(s) or 0), 'mps', 'mps')}
 
 
 def parse(yr, month, day, time):
@@ -92,9 +97,9 @@ def selectThreshold(data, minexc=10):
 
     eps = -0.01
     nobs = len(data)
-    mu = np.median(data)
+    mu = data.max()/2.
+    log.info("Minimum threshold: {0}".format(mu))
     while mu < data.max():
-        #    for mu in np.arange(np.median(data), data.max(), 0.002):
         nexc = len(data[data > mu])
         rate = nexc / nobs
         if nexc < minexc:
@@ -150,6 +155,9 @@ def readDataFile(filename):
     """
     Read a data file containing daily maximum wind speed records.
 
+    :param str filename: Full path to input data file.
+    :returns: :class:`pandas.DataFrame`containing observation data.
+
     """
     # Column names of the data files:
     names = ['dc', 'StnNum', 'Year', 'Month', 'Day', 'Speed',
@@ -158,8 +166,8 @@ def readDataFile(filename):
     df = pd.read_csv(filename, skipinitialspace=True,
                      skiprows=1, names=names,
                      parse_dates=[['Year', 'Month', 'Day', 'Time']],
-                     date_parser=parse, index_col=False)
-    # converters=CONVERTERS)
+                     date_parser=parse, index_col=False)#,
+                     #converters=CONVERTERS)
 
     return df
 
@@ -183,65 +191,136 @@ def readStationFile(stnFile):
 
     dtype = {"stnNum": str}
     stndf = pd.read_csv(stnFile, skipinitialspace=True, names=names,
-                        index_col=False, dtype=dtype)  # , skiprows=1)
+                        index_col=False, dtype=dtype) #, skiprows=1)
     log.info("Loaded details of {0} stations".format(len(stndf.index)))
     return stndf
 
 #------------------------------------------------
 # Main execution code:
+def main(configFile):
+    """
+    Main function to execute the program
 
-input_path = "C:/WorkSpace/data/daily/input/"
-output_path = "C:/WorkSpace/data/daily/output/2006"
-logfile = pjoin(output_path, "estimate_return_period.log")
-loglevel = "INFO"
+    :param str configFile: Path to configuration file.
 
-log = flStartLog(logfile, loglevel, True, True)
+    """
+    config = ConfigParser()
+    config.read(configFile)
+
+    input_path = config.get('Input', 'Path')
+    output_path = config.get('Output', 'Path')
+    stationFile = config.get('Input', 'StationFile')
+    basefile = config.get('Input', 'BaseFile')
+
+    stndf = readStationFile(stationFile)
+
+    gpdfile = open(pjoin(output_path, "gpdtable_ms.csv"), 'w')
+    gpdfile.write("Station, Name, shape, scale, threshold, rate\n")
+
+    rp = np.array([1, 2, 5, 10, 20, 50, 100, 200,
+                   500, 1000, 2000, 5000, 10000])
+
+    rpfile = open(pjoin(output_path, "rptable_ms.csv"), 'w')
+    rpfile.write("Station, Name," + ", ".join(rp.astype(str)) + "\n")
+
+    for i in stndf.index:
+        stnNum = stndf['stnNum'][i]
+        filename = pjoin(input_path, basefile.format(stnNum))
+        dataRange = "({0} - {1})".format(stndf['DataStartYear'][i],
+                                         stndf['DataEndYear'][i])
+        stnName = stndf['stnName'][i].title().strip() + " " + dataRange
+        fitname = pjoin(output_path, '{0}_gpdfit.png'.format(stnNum))
+        diagname = pjoin(output_path, '{0}_gpddiag.png'.format(stnNum))
+        if exists(filename):
+            log.info("Processing {0}".format(stnName))
+            df = readDataFile(filename)
+            quality = df['QSpeed'].fillna("X").map(lambda x: x in
+                                                   ['Y', 'N', 'X', ' ', np.nan])
+            dmax = df['Speed'][df['Speed'].notnull() & quality]
+            if len(dmax) == 0:
+                log.info("No valid data")
+                continue
+            xi, sigma, mu = selectThreshold(dmax, minexc=10)
+            log.debug("Parameters: {0}, {1}, {2}".format(xi, sigma, mu))
+            rate = float(len(dmax[dmax > mu])) / float(len(dmax))
+            if xi == 0:
+                continue
+            plotFit(dmax, mu, xi, sigma, stnName, fitname)
+            plotDiagnostics(dmax, mu, xi, sigma, diagname)
+
+            gpdfile.write("{0}, {1}, {2:.6f}, {3:.6f}, {4:.3f}, {5:.4f}\n".
+                          format(stnNum, stnName, xi, sigma, mu, rate))
+            rpvals = returnLevels(rp, mu, xi, sigma, rate)
+            rpstr = ", ".join(['{:.3f}'] * len(rpvals)).format(*rpvals)
+            rpfile.write("{0}, {1}, {2}\n".format(stnNum, stnName, rpstr))
+        else:
+            log.info("No data file for {0}".format(stnName))
+    gpdfile.close()
+    rpfile.close()
+    log.info("Completed %s", sys.argv[0])
 
 
-stationFile = pjoin(input_path, "DC02D_StnDet_99999999720437.txt")
-stndf = readStationFile(stationFile)
-basefile = "DC02D_Data_{0}_99999999720437.txt"
+def startup():
+    """
+    Parse command line arguments and call the :func:`main` function.
+    """
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--config_file',
+                        help='Path to configuration file')
+    parser.add_argument('-v', '--verbose', help='Verbose output',
+                        action='store_true')
+    parser.add_argument('-d', '--debug', help='Allow pdb traces',
+                        action='store_true')
+    args = parser.parse_args()
 
-gpdfile = open(pjoin(output_path, "gpdtable_ms.csv"), 'w')
-gpdfile.write("Station, Name, shape, scale, threshold, rate\n")
+    configFile = args.config_file
+    config = ConfigParser()
+    config.read(configFile)
 
-rp = np.array([1, 2, 5, 10, 20, 50, 100, 200,
-               500, 1000, 2000, 5000, 10000])
+    logfile = config.get('Logging', 'LogFile')
+    logdir = dirname(realpath(logfile))
 
-rpfile = open(pjoin(output_path, "rptable_ms.csv"), 'w')
-rpfile.write("Station, Name," + ", ".join(rp.astype(str)) + "\n")
+    # If log file directory does not exist, create it
+    if not isdir(logdir):
+        try:
+            os.makedirs(logdir)
+        except OSError:
+            logfile = flConfigFile('.log')
 
-for i in stndf.index:
-    stnNum = stndf['stnNum'][i]
-    filename = pjoin(input_path, basefile.format(stnNum))
-    dataRange = "({0} - {1})".format(stndf['DataStartYear'][i],
-                                     stndf['DataEndYear'][i])
-    stnName = stndf['stnName'][i].title().strip() + " " + dataRange
-    fitname = pjoin(output_path, '{0}_gpdfit.png'.format(stnNum))
-    diagname = pjoin(output_path, '{0}_gpddiag.png'.format(stnNum))
-    if os.path.exists(filename):
-        log.info("Processing {0}".format(stnName))
-        df = readDataFile(filename)
-        quality = df['QSpeed'].fillna("X").map(lambda x: x in
-                                               ['Y', 'N', 'X', ' ', np.nan])
-        dmax = df['Speed'][df['Speed'].notnull() & quality]
-        if len(dmax) == 0:
-            log.info("No valid data")
-            continue
-        xi, sigma, mu = selectThreshold(dmax, minexc=10)
-        log.debug("Parameters: {0}, {1}, {2}".format(xi, sigma, mu))
-        rate = float(len(dmax[dmax > mu])) / float(len(dmax))
-        if xi == 0:
-            continue
-        plotFit(dmax, mu, xi, sigma, stnName, fitname)
-        plotDiagnostics(dmax, mu, xi, sigma, diagname)
+    logLevel = config.get('Logging', 'LogLevel')
+    verbose = config.getboolean('Logging', 'Verbose')
+    datestamp = config.getboolean('Logging', 'Datestamp')
+    debug = False
 
-        gpdfile.write("{0}, {1}, {2:.6f}, {3:.6f}, {4:.3f}, {5:.4f}\n".
-                      format(stnNum, stnName, xi, sigma, mu, rate))
-        rpvals = returnLevels(rp, mu, xi, sigma, rate)
-        rpstr = ", ".join(['{:.3f}'] * len(rpvals)).format(*rpvals)
-        rpfile.write("{0}, {1}, {2}\n".format(stnNum, stnName, rpstr))
+    if args.verbose:
+        verbose = True
+
+    if args.debug:
+        debug = True
+
+    log = flStartLog(logfile, logLevel, verbose, datestamp)
+    import warnings
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    warnings.filterwarnings("ignore", category=UserWarning, module="pytz")
+    warnings.filterwarnings("ignore", category=UserWarning, module="numpy")
+    warnings.filterwarnings("ignore", category=UserWarning,
+                            module="matplotlib")
+
+    warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+    if debug:
+        main(configFile)
     else:
-        log.info("No data file for {0}".format(stnName))
-gpdfile.close()
-rpfile.close()
+        try:
+            main(configFile)
+        except ImportError as e:
+            log.critical("Missing module: {0}".format(e.strerror))
+        except Exception:  # pylint: disable=W0703
+            # Catch any exceptions that occur and log them (nicely):
+            tblines = traceback.format_exc().splitlines()
+            for line in tblines:
+                log.critical(line.lstrip())
+                
+if __name__ == '__main__':
+    startup()
