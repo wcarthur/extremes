@@ -64,8 +64,8 @@ def plotFit(data, mu, xi, sigma, title, figfile):
                 color='r', label="Empirical RP")
 
     title_str = (title + "\n" +
-                 r"$\mu$ = {0:.2f}, $\xi$ = {1:.5f}, $\sigma$ = {2:.4f}".
-                 format(mu, xi, sigma))
+                 r"$\mu$ = {0:.2f}, $\xi$ = {1:.5f}, $\sigma$ = {2:.4f}, $\rho$ = {3:.4f}".
+                 format(mu, xi, sigma, rate))
     ax1.set_title(title_str)
     ax1.legend(loc=2)
     ax1.set_ylim((0, 100))
