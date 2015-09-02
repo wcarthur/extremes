@@ -61,7 +61,7 @@ paramCI = function (z, m, conf = 0.95, nint = 100, rl.xup = NULL, rl.xlow = NULL
         x <- seq(rl.xlow, rl.xup, length = nint)
         sol <- z$mle[2]
         gpd.plik <- function(a) {
-            if (m != Inf)
+            if (m != Inf || m*la == 1 )
                 sc <- (a * (xp - u))/((m * la)^a - 1)
             else sc <- (u - xp)/a
             if (abs(a) < 10^(-4))

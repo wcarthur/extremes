@@ -38,7 +38,7 @@ select_threshold = function(data,yrs,init=0,resol=-1,last=-1){
   eps <- -0.01
   mx_ws <- max(data)
   count <- 0
-  mx_iter <- 5000    #max. steps allowed
+  mx_iter <- 50000    #max. steps allowed
   initial_pr <- 1     #Initial value of retp-axis in GPD
   
   u_vec <- c()

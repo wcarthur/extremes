@@ -50,14 +50,15 @@ for (i in 1:nstns){
     ws = ws/3.6
 
     # Set an initial threshold for estimating the most suitable threshold
-    init_u <- 0.3*max(ws)
+    init_u <- median(ws) # 0.3*max(ws)
 
     # Number of years
     nyrs <- round(length(ws)/365,0)
 
     # Evaluate the most appropriate threshold:
     # C:/WorkSpace/bin/process/extremes/sel_approp_u.r
-    u <- select_threshold(ws,nyrs,init_u,0.01)
+    print(paste("Initial threshold: ", init_u, sep=""))
+    u <- select_threshold(ws, nyrs, init_u, 0.001)
     #    print(u)
     if (u[1] == 0){
       print(paste("Fitting routine failed for ",stnNum,sep=""))
