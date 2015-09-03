@@ -61,18 +61,23 @@ paramCI = function (z, m, conf = 0.95, nint = 100, rl.xup = NULL, rl.xlow = NULL
         x <- seq(rl.xlow, rl.xup, length = nint)
         sol <- z$mle[2]
         gpd.plik <- function(a) {
-            if (m != Inf || m*la == 1 )
-                sc <- (a * (xp - u))/((m * la)^a - 1)
-            else sc <- (u - xp)/a
-            if (abs(a) < 10^(-4))
-                l <- length(xdat) * log(sc) + sum(xdat - u)/sc
+            if (m != Inf && m != 1/la ){
+              sc <- (a * (xp - u))/((m * la)^a - 1)
+            } else if (m == 1/la) {
+              sc <- 0
+            }
             else {
-                y <- (xdat - u)/sc
-                y <- 1 + a * y
-                if (any(y <= 0) || sc <= 0)
-                  l <- 10^6
-                else l <- length(xdat) * log(sc) + sum(log(y)) *
-                  (1/a + 1)
+              sc <- (u - xp)/a
+            }
+            if (abs(a) < 10^(-4))
+              l <- length(xdat) * log(sc) + sum(xdat - u)/sc
+            else {
+              y <- (xdat - u)/sc
+              y <- 1 + a * y
+              if (any(y <= 0) || sc <= 0)
+                l <- 10^6
+              else l <- length(xdat) * log(sc) + sum(log(y)) *
+                (1/a + 1)
             }
             l
         }
