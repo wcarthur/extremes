@@ -1,3 +1,6 @@
+#plotGPD(z$mle, z$threshold, z$rate, z$n, z$npy, z$cov, z$data, z$xdata,
+#        xlabel="Return period (years)", ylabel="Wind speed (m/s)", plotpoints=TRUE)
+
 plotGPD = function(a, u, la, n, npy, mat, dat, xdat, xlabel="",ylabel="",plotpoints=FALSE)
 {
     a <- c(la, a)
@@ -30,7 +33,7 @@ plotGPD = function(a, u, la, n, npy, mat, dat, xdat, xlabel="",ylabel="",plotpoi
     }
 }
 
-plotGPD_CI = function(dataset,yrs,threshold,RP,confInt=0.95,plotObs=FALSE)
+plotGPD_CI = function(dataset,yrs,threshold,RP,confInt=0.95,plotpoints=FALSE)
 {
     library("ismev")
     source(paste(sdir,"profileFit.r",sep="") )
@@ -43,9 +46,9 @@ plotGPD_CI = function(dataset,yrs,threshold,RP,confInt=0.95,plotObs=FALSE)
     lines(cbind(RP,gpdfit[,2]),lty=2,col="blue")
     lines(cbind(RP,gpdfit[,4]),lty=2,col="blue")
     grid(equilogs=FALSE)
-    if (plotObs==TRUE){
+    if (plotpoints==TRUE){
       npy=365.25
-      nl = gpdfit$n - length(dataset) + 1
+      n = length(dataset)
       sdat = sort(dataset)
       emprp = (1/(1 - (1:n)/(n + 1))/npy)
       points(emprp[emprp > 1], sdat[emprp > 1], col="red", pch=16)
