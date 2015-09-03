@@ -84,7 +84,7 @@ for (i in 1:nstns){
     print("Plotting return levels with MLE CIs")
     jpeg(paste(outdir,toString(stnNum),".jpg",sep=""), width=640, height=640, quality=100)
     plot.new()
-    plotGPD_CI(ws, nyrs, u[1], retper, plotObs=F)
+    plotGPD_CI(ws, nyrs, u[1], retper, plotpoints=T)
     dev.off()
     print("Plotting fit diagnostics")
     jpeg(paste(outdir, toString(stnNum), "_diag.jpg", sep=""),
