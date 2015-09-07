@@ -51,13 +51,18 @@ paramCI = function (z, m, conf = 0.95, nint = 100, rl.xup = NULL, rl.xlow = NULL
         if (vv == 0){
           l <- 0
           l
+        } else if (abs(vv) < 1e-6){
+          vv = 0
+          l <- 0
+          l
         }
         if (est.rl.xlow)
             rl.xlow <- rl.mle - 1.5 * qnorm((1 - conf)/2, lower.tail = FALSE) *
-                sqrt(vv)
+                sqrt(abs(vv))
         if (est.rl.xup)
             rl.xup <- rl.mle + 1.5 * qnorm((1 - conf)/2, lower.tail = FALSE) *
-                sqrt(vv)
+                sqrt(abs(vv))
+        
         x <- seq(rl.xlow, rl.xup, length = nint)
         sol <- z$mle[2]
         gpd.plik <- function(a) {
@@ -65,8 +70,7 @@ paramCI = function (z, m, conf = 0.95, nint = 100, rl.xup = NULL, rl.xlow = NULL
               sc <- (a * (xp - u))/((m * la)^a - 1)
             } else if (m == 1/la) {
               sc <- 0
-            }
-            else {
+            } else {
               sc <- (u - xp)/a
             }
             if (abs(a) < 10^(-4))

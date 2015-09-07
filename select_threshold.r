@@ -63,7 +63,7 @@ select_threshold = function(data,yrs,init=0,resol=-1,last=-1){
     noveru <- length(data[data > u])
     #print(paste("N over u = ",toString(noveru),sep=""))
     
-    if(noveru < 10) {
+    if(noveru <= 10) {
       break
     }
     if(last > 0 & u > last){
