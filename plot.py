@@ -56,7 +56,7 @@ def plotFit(data, mu, xi, sigma, title, figfile):
     sortedmax = np.sort(data)
     fig, ax1 = plt.subplots(1, 1, figsize=(12, 12))
     ax1.semilogx(rp, rval, label="Fitted RP curve")
-    ax1.semilogx(rp, rval + 1.96 * err, label="90% CI",
+    ax1.semilogx(rp, rval + 1.96 * err, label="95% CI",
                  linestyle='--', color='0.5')
     ax1.semilogx(rp, rval - 1.96 * err, linestyle='--', color='0.5')
 
@@ -124,9 +124,11 @@ def plotDiagnostics(data, mu, xi, sigma, figfile):
     maxbin = 4 * np.ceil(np.floor(data.max() / 4) + 1)
     sns.distplot(sortedmax, bins=np.arange(mu, maxbin, 2),
                  hist=True, axlabel='Wind speed (m/s)',
+                 kde_kws={"label":"Empirical PDF"},
                  ax=axes[3])
-    axes[3].plot(sortedmax, gpdf, color='r')
+    axes[3].plot(sortedmax, gpdf, color='r', label='Fitted PDF')
     axes[3].set_title("Density plot")
+    axes[3].legend(loc=1)
     plt.tight_layout()
     plt.savefig(figfile)
     plt.close()
