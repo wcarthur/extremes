@@ -21,9 +21,9 @@ from Utilities.files import flStartLog, flConfigFile
 from Utilities.metutils import convert
 from Utilities.config import ConfigParser
 
-CONVERTERS = {'Speed': lambda s: convert((float(s) or 0), 'kmh', 'mps'),
-              'Gust': lambda s: convert((float(s) or 0), 'kmh', 'mps'),}
-
+#CONVERTERS = {'Speed': lambda s: convert((float(s) or 0), 'kmh', 'mps'),
+#              'Gust': lambda s: convert((float(s) or 0), 'kmh', 'mps'),}
+CONVERTERS = {'Datetime': lambda s: datetime.strptime(s, "%Y-%m-%d %H:%M:%S")}
 
 def parse(yr, month, day, hour, minute):
     """
@@ -163,21 +163,20 @@ def readDataFile(filename):
 
     """
     # Column names of the data files:
-    DTYPE = [('id', 'S8'), ('hm', 'S2'), ('StnNum', 'i'), ('Year', 'i'), 
-             ('Month', 'i'), ('Day', 'i'), ('Hour', 'i'), ('Minute', 'i'), 
-             ('dtStdYear', 'i'), ('dtStdMonth', 'i'), ('dtStdDay', 'i'), 
-             ('dtStdHour', 'i'), ('dtStdMinute', 'i'), ('Speed', 'f8'), 
-             ('QSpeed', 'S1'), ('Dir', 'f8'), ('QDir', 'S1'), ('Gust', 'f8'), 
-             ('QGust', 'S1'), ('AWSFlag', 'S2'), ('end', 'S1'), 
-             ('TCName', 'S10')]
+    DTYPE = [('id', 'S8'), ('StnNum', 'i'), ('Datetime', 'S19'),
+              ('Gust', 'f8'), ('Dir', 'f8'), ('QGust', 'S1'), 
+              ('TCName', 'S10')]
     NAMES = [fields[0] for fields in DTYPE]
-    df = pd.read_csv(filename, skipinitialspace=True,
-                     skiprows=1, names=NAMES,
-                     parse_dates=[['Year', 'Month', 'Day', 'Hour', 'Minute']],
-                     date_parser=parse, index_col=False,
-                     converters=CONVERTERS)
-
-    return df
+    try:
+        df = pd.read_csv(filename, skipinitialspace=True,
+                         skiprows=1, names=NAMES,
+                         index_col=False,
+                         converters=CONVERTERS)
+    except:
+        log.warn("Error reading file")
+        return None
+    else:
+        return df
 
 
 def readStationFile(stnFile):
@@ -243,6 +242,8 @@ def main(configFile):
         if exists(filename):
             log.info("Processing {0}".format(stnName))
             df = readDataFile(filename)
+            if df is None:
+                continue
             quality = df['QGust'].fillna("X").map(lambda x: x in
                                                    ['Y', 'N', 'X', ' ', np.nan])
             dmax = df['Gust'][df['Gust'].notnull() & quality]
@@ -254,8 +255,8 @@ def main(configFile):
 
             if xi == 0:
                 continue
-            tdelta = df.Year_Month_Day_Hour_Minute.max().year - \
-                     df.Year_Month_Day_Hour_Minute.min().year
+            tdelta = df.Datetime.max().year - \
+                     df.Datetime.min().year
             dummydata = np.zeros(int(tdelta+1)*365)
             ndata = len(dmax)
             dummydata[-ndata:] = dmax
