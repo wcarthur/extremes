@@ -27,7 +27,7 @@ def returnLevels(intervals, mu, xi, sigma, rate, npyr=OBS_PER_YEAR):
     Calculate return levels for specified intervals for a distribution with
     the given threshold, scale and shape parameters.
 
-    :param intervals: :class:`numpy.ndarray` or float of return period intervals
+    :param intervals: :class:`numpy.ndarray` or float of recurrence intervals
               to evaluate return levels for.
     :param float mu: Threshold parameter (also called location).
     :param float xi: Shape parameter.
@@ -36,7 +36,7 @@ def returnLevels(intervals, mu, xi, sigma, rate, npyr=OBS_PER_YEAR):
                        than `mu`, divided by total number of observations).
     :param float npyr: Number of observations per year.
 
-    :returns: return levels for the specified return intervals.
+    :returns: return levels for the specified recurrence intervals.
 
     """
 
@@ -46,7 +46,7 @@ def returnLevels(intervals, mu, xi, sigma, rate, npyr=OBS_PER_YEAR):
 
 def empiricalReturnPeriod(data, npyr=OBS_PER_YEAR):
     """
-    Returns the empirically-based return interval (in years) for a set
+    Returns the empirically-based recurrence interval (in years) for a set
     of observations.
 
     It is assumed the data are daily observations.
@@ -57,7 +57,7 @@ def empiricalReturnPeriod(data, npyr=OBS_PER_YEAR):
                  missing values removed).
     :param float npy: Number of observations per year (default=365.25)
 
-    :returns: Return periods for the observed data.
+    :returns: Recurrence intervals for the observed data.
     :rtype: :class:`numpy.ndarray`
     """
     nobs = len(data)
@@ -111,3 +111,43 @@ def returnPeriodUncertainty(data, mu, xi, sigma, intervals):
     rpFitError = np.std(rpvalues, axis=0)
 
     return rpFitError
+
+def returnPeriodConfidence(data, mu, xi, sigma, intervals):
+    """
+    Calculate confidence intervals around a fit, using bootstrap resampling. 
+
+    :param data: :class:`numpy.ndarray` containing the observed values (with
+                 missing values removed).
+    :param float mu: Threshold parameter (also called location).
+    :param float xi: Shape parameter.
+    :param float sigma: Scale parameter.
+    :param intervals: :class:`numpy.ndarray` or float of recurrence intervals
+              to evaluate return level uncertainties for. 
+
+    :returns: 5th and 95th percentile values of return level for the given 
+              recurrence intervals.
+    :rtype: :class:`numpy.ndarray`
+
+    """
+
+    from scipy.stats import scoreatpercentile as percentile
+    sortedmax = np.sort(data[data > mu])
+    nobs = len(sortedmax)
+    rate = float(nobs) / float(len(data))
+    rpvals = np.zeros((len(intervals), 1000))
+    for i in range(1000):
+        sample = np.random.choice(sortedmax, size=len(sortedmax)-1)
+        emppdf = empiricalPDF(sample)
+        try:
+            popt, pcov = curve_fit(lambda x, mu, xi, sigma:
+                                   genpareto.pdf(x, xi, loc=mu, scale=sigma),
+                                   sample, emppdf, (mu, xi, sigma), maxfev=5000)
+        except RuntimeError:
+            pass
+        else:
+            rpvals[:, i] = returnLevels(intervals, popt[0], popt[1], popt[2], rate)
+        
+    rp95CI = np.percentile(rpvals, 95, axis=1)
+    rp05CI = np.percentile(rpvals, 5, axis=1)
+
+    return (rp05CI, rp95CI)
