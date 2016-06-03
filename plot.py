@@ -74,7 +74,12 @@ def plotFit(data, mu, xi, sigma, title, figfile):
     ax1.set_xlabel('Return period (years)')
     ax1.grid(which='major')
     ax1.grid(which='minor', linestyle='--', linewidth=1)
-
+    ax1.axhline(45.6, c='lime', linestyle='--', linewidth=2)
+    ax1.axhline(62.5, c='darkorange', linestyle='--', linewidth=2)
+    ax1.axhline(77.8, c='darkred', linestyle='--', linewidth=2)
+    ax1.text(20000, 45.6, 'Cat 3', ha='center')
+    ax1.text(20000, 62.5, 'Cat 4', ha='center')
+    ax1.text(20000, 77.8, 'Cat 5', ha='center')
     plt.savefig(figfile)
     plt.close()
 
