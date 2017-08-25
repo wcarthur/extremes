@@ -11,16 +11,16 @@ source(paste(sdir, "profileFit.r", sep = ""))
 source(paste(sdir, "bisearch.R", sep = ""))
 source(paste(swcdir, "evmix_fit.R", sep = ""))
 
-indir = "C:/WorkSpace/data/daily/input/2012/"
-outdir = "C:/WorkSpace/data/daily/output/2012/"
+indir = "C:/WorkSpace/data/raw/daily_max_wind_gust/"
+outdir = "C:/WorkSpace/data/derived/daily_max_wind_gust/output/"
 
 setwd(indir)
 print(paste("Indir = ", indir ,sep = "") )
 
-stationFile <- paste(indir, "WStn_names.txt", sep = "")
+stationFile <- paste(indir, "DC02D_StnDet_999999999425050.txt", sep = "")
 
 stations <- read.table(stationFile, sep = ",", header = T)
-nstns <- length(stations$X)
+nstns <- length(stations$Station.Name)
 retper <- c(2,5,10,20,25,30,40,50,75,100,200,250,300,400,500,750,1000,2000,2500,3000,4000,5000,7500,10000)
 all_pars_file <- paste(outdir, "station_params_mixture.txt", sep = "")
 all_RPs_file <- paste(outdir, "station_ari_bayes.txt", sep = "")
@@ -31,9 +31,9 @@ cat(table_head, fill = T, file = all_pars_file, append = F)
 #table_head <- paste("Station",toString(retper),sep=" ")
 #cat(table_head,file=all_RPs_file,fill=T,append=F)
 for (i in 1:nstns) {
-    stnNum <- stations$Number[i]
-    stnName <- stations$Name[i]
-    stnFile <- paste(indir,stations$File[i],sep = "")
+    stnNum <- stations$Bureau.of.Meteorology.Station.Number[i]
+    stnName <- stations$Station.Name[i]
+    stnFile <- paste(indir, sprintf("DC02D_Data_%06d_999999999425050.txt", stnNum),sep = "")
     print(paste( "Station file: ",stnFile,sep = "") )
 
     # Load the data file:
@@ -55,18 +55,17 @@ for (i in 1:nstns) {
 
     # Create the fit environment for the dataset:
     fitenv = fit_gpd_mixture(data = ws,
-                             gpd_threshold_quantile_range = c(0.5, 0.995))
+                             gpd_threshold_quantile_range = c(0.95, 0.995))
 
     # Run the MCMC fitting routine:
-    mcmc_gpd_mixture(fitenv,
-                     annual_event_rate = 365.)
+    mcmc_gpd_mixture(fitenv, annual_event_rate = 365.)
 
     # Create the plot of ARI values
     print("Plotting return levels with Bayesian credible intervals")
-    jpeg(paste(outdir,toString(stnNum), "_mcmc_ari.jpg", sep = ""),
-         width = 640, height = 640, quality = 100)
+    png(paste(outdir,toString(stnNum), "_mcmc_ari.png", sep = ""),
+         width = 640, height = 640)
     plot.new()
-    mcmc_rl_plot(fitenv, xlim = c(10, 0.0001))
+    mcmc_rl_plot(fitenv, xlim = c(10, 0.01))
     dev.off()
 
     # Set an initial threshold for estimating the most suitable threshold
