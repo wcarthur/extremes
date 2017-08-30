@@ -80,24 +80,4 @@ def generateDistributions(data, mu, xi, sigma):
 
     return emppdf, gpdf
 
-def asymptote(mu, xi, sigma):
-    """
-    Calculate the limiting value of a (bounded) GPD, based on the fitted
-    values of mu, sigma and xi (as demonstrated in Coles,2001). Note xi is
-    negative, so we take the absolute value of the relation.
 
-    :param float mu: Location parameter of the fitted GPD.
-    :param float xi: Shape parameter of the fitted GPD.
-    :param float sigma: Scale parameter of the fitted GPD.
-
-    :returns: asymptote value
-    :rtype: float
-
-    :raises ValueError: If sigma >= 0, which defines an unbounded GPD.
-    """
-
-    if sigma >= 0.0:
-        raise ValueError("Shape parameter value defines unbounded distribution")
-    limit = np.abs((mu - xi) / sigma)
-
-    return limit

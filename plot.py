@@ -22,8 +22,7 @@ import statsmodels.api as sm
 import logging
 LOG = logging.getLogger(__name__)
 
-from return_period import returnLevels, empiricalReturnPeriod, \
-    returnPeriodUncertainty
+from extremes import returnLevels, empReturnPeriod, returnPeriodUncertainty
 from distributions import fittedPDF
 
 sns.set_context("poster")
@@ -50,7 +49,7 @@ def plotFit(data, mu, xi, sigma, title, figfile):
     rate = float(len(data[data > mu])) / float(len(data))
     rval = returnLevels(rp, mu, xi, sigma, rate)
 
-    emprp = empiricalReturnPeriod(data)
+    emprp = empReturnPeriod(data)
     err = returnPeriodUncertainty(data, mu, xi, sigma, rp)
 
     sortedmax = np.sort(data)
@@ -117,7 +116,7 @@ def plotDiagnostics(data, mu, xi, sigma, figfile):
     rate = float(len(sortedmax)) / float(len(data))
     rval = returnLevels(rp, mu, xi, sigma, rate)
 
-    emprp = empiricalReturnPeriod(np.sort(data))
+    emprp = empReturnPeriod(np.sort(data))
     ax2.semilogx(rp, rval, label="Fitted RP curve", color='r')
     ax2.scatter(emprp[emprp > 1], np.sort(data)[emprp > 1],
                 color='b', label="Empirical RP", s=100)

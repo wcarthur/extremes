@@ -13,14 +13,11 @@ import database
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import pandas as pd
-import statsmodels.api as sm
 
 from scipy.stats import genpareto, scoreatpercentile
 
 from Utilities.config import ConfigParser
-from return_period import returnLevels, empiricalReturnPeriod, returnPeriodUncertainty
-from calculate_return_periods import selectThreshold
+from extremes import returnLevels, empReturnPeriod, returnPeriodUncertainty, nearestIndex, gpdCalculateShape, gpdSelectThreshold
 from distributions import fittedPDF
 
 
@@ -32,10 +29,11 @@ import seaborn as sns
 sns.set_context("poster")
 sns.set_style("whitegrid")
 
+
 def run_fit(recs, locId, locName, outputPath):
     log.info("Processing {0}".format(locName))
-    xi, sigma, mu = selectThreshold(recs['wspd'])
-    thresh = np.percentile(recs['wspd'], 95)
+    xi, sigma, mu = gpdSelectThreshold(recs['wspd'])
+    thresh = np.percentile(recs['wspd'], 99.5)
     gpd = genpareto.fit(recs['wspd'][recs['wspd'] > thresh], floc=thresh)
     data = np.zeros(int(5000 * 365.25))
     data[-len(recs):] = recs['wspd']
@@ -51,11 +49,12 @@ def run_fit(recs, locId, locName, outputPath):
     rate2 = float(len(data[data > thresh])) / float(len(data))
     rval2 = returnLevels(rp, thresh, gpd[0], gpd[2], rate2)
 
-    emprp = empiricalReturnPeriod(data)
+    emprp = empReturnPeriod(data)
     sortedmax = np.sort(data)
     fig, ax1 = plt.subplots(1, 1)
     ax1.semilogx(rp, rval, label="Fitted hazard curve")
-    ax1.semilogx(rp, rval2 , label=r"$\mu$ = {0}".format(max(data)/2), color='0.5')
+    ax1.semilogx(rp, rval2 , label=r"$\mu$ = {0}".format(max(data)/2),
+                 color='0.5')
     ax1.scatter(emprp[emprp > 1], sortedmax[emprp > 1], s=100,
                     color='r', label="Empirical ARI")
 
@@ -70,9 +69,9 @@ def run_fit(recs, locId, locName, outputPath):
     ax1.set_xlabel('Average recurrence interval (years)')
     ax1.grid(which='major', linestyle='-')
     ax1.grid(which='minor', linestyle='--', linewidth=1)
-    ax1.axhline(45.6, c='lime', linestyle='--', linewidth=2)#, label='Cat 3')
-    ax1.axhline(62.5, c='darkorange', linestyle='--', linewidth=2)#, label='Cat 4')
-    ax1.axhline(77.8, c='darkred', linestyle='--', linewidth=2)#, label='Cat 5')
+    ax1.axhline(45.6, c='lime', linestyle='--', linewidth=2)
+    ax1.axhline(62.5, c='darkorange', linestyle='--', linewidth=2)
+    ax1.axhline(77.8, c='darkred', linestyle='--', linewidth=2)
     ax1.text(20000, 45.6, 'Cat 3', ha='center')
     ax1.text(20000, 62.5, 'Cat 4', ha='center')
     ax1.text(20000, 77.8, 'Cat 5', ha='center')
@@ -91,14 +90,18 @@ def main(configFile):
     locations = db.getLocations()
     log.info("There are {0} locations in the database".format(len(locations)))
     locNameList = list(locations['locName'])
-    outputPath = ""#"/c/WorkSpace/data/Derived/tc/fitting"
+    outputPath = config.get("Output", "Path")
+    plotPath = pjoin(outputPath, "plots")
+    processPath = pjoin(outputPath, "process")
 
-    fh = open(pjoin(outputPath, "parameters.csv"), "w")
+    fh = open(pjoin(processPath, "parameters.csv"), "w")
     for loc in locNameList:
+        log.info("Running calculations for {0}".format(loc))
         locId = locations['locId'][locNameList.index(loc)]
         recs = database.locationRecords(db, locId)
-        (mu, xi, sigma), (gpd) = run_fit(recs, locId, loc, outputPath)
-        fh.write("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5}\n".format(loc, xi, sigma, mu, recs['wspd'].max()/2, gpd))
+        (mu, xi, sigma), (gpd) = run_fit(recs, locId, loc, plotPath)
+        fh.write("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5}\n".
+                 format(loc, xi, sigma, mu, recs['wspd'].max()/2, gpd))
 
     fh.close()
     
