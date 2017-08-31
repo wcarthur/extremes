@@ -1,28 +1,20 @@
 from __future__ import print_function, division
 
-from os.path import join as pjoin, realpath, isdir, dirname, exists
-import logging as log
 import os
-import sys
+from os.path import join as pjoin, realpath, isdir, dirname
+import logging as log
 import traceback
-from datetime import datetime
-
 
 import argparse
 import database
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 
-from scipy.stats import genpareto, scoreatpercentile
+from scipy.stats import genpareto
 
-from Utilities.config import ConfigParser
-from extremes import returnLevels, empReturnPeriod, returnPeriodUncertainty, nearestIndex, gpdCalculateShape, gpdSelectThreshold
-from distributions import fittedPDF
-
+from extremes import gpdSelectThreshold, returnLevels, empReturnPeriod
 
 from Utilities.files import flStartLog, flConfigFile
-
 from Utilities.config import ConfigParser
 
 import seaborn as sns
@@ -30,22 +22,34 @@ sns.set_context("poster")
 sns.set_style("whitegrid")
 
 
-def run_fit(recs, locId, locName, outputPath):
+def runFit(recs, locId, locName, numYears, outputPath):
+    """
+    Run a GPD fitting routine, using both the threshold selection algorithm
+    and a simple regression fit (using `scipy.stats.rv_distribution.fit`).
+
+    """
     log.info("Processing {0}".format(locName))
+
+    # Run the threshold selection algorithm:
     xi, sigma, mu = gpdSelectThreshold(recs['wspd'])
+
+    # Determine a GPD fit using a fixed threshold (99.5 percentile):
     thresh = np.percentile(recs['wspd'], 99.5)
     gpd = genpareto.fit(recs['wspd'][recs['wspd'] > thresh], floc=thresh)
-    data = np.zeros(int(5000 * 365.25))
+
+    data = np.zeros(int(numYears * 365.25))
     data[-len(recs):] = recs['wspd']
     rp = np.array([1, 2, 5, 10, 20, 50, 100, 200,
                    500, 1000, 2000, 5000, 10000])
 
+    # Rate of exceedances above the algorithmically-selected threshold:
     rate = float(len(data[data > mu])) / float(len(data))
     if xi == 0:
         rval = np.zeros(len(rp))
     else:
         rval = returnLevels(rp, mu, xi, sigma, rate)
 
+    # Rate of exceedances above 99.5th percentile:
     rate2 = float(len(data[data > thresh])) / float(len(data))
     rval2 = returnLevels(rp, thresh, gpd[0], gpd[2], rate2)
 
@@ -53,14 +57,15 @@ def run_fit(recs, locId, locName, outputPath):
     sortedmax = np.sort(data)
     fig, ax1 = plt.subplots(1, 1)
     ax1.semilogx(rp, rval, label="Fitted hazard curve")
-    ax1.semilogx(rp, rval2 , label=r"$\mu$ = {0}".format(max(data)/2),
+    ax1.semilogx(rp, rval2, label=r"$\mu$ = {0}".format(max(data)/2),
                  color='0.5')
     ax1.scatter(emprp[emprp > 1], sortedmax[emprp > 1], s=100,
-                    color='r', label="Empirical ARI")
+                color='r', label="Empirical ARI")
 
     title_str = (locName   + "\n" +
                  r"$\mu$ = {0:.3f}, $\xi$ = {1:.5f}, $\sigma$ = {2:.4f}".
                  format(mu, xi, sigma))
+
     ax1.set_title(title_str)
     ax1.set_ylim((0, 100))
     ax1.set_yticks(np.arange(0, 101, 10))
@@ -76,6 +81,7 @@ def run_fit(recs, locId, locName, outputPath):
     ax1.text(20000, 62.5, 'Cat 4', ha='center')
     ax1.text(20000, 77.8, 'Cat 5', ha='center')
     ax1.legend(loc=2)
+    fig.tight_layout()
     plt.savefig(pjoin(outputPath, "{0}.png".format(locId)))
     plt.close()
     return (mu, xi, sigma), (gpd)
@@ -91,27 +97,27 @@ def main(configFile):
     log.info("There are {0} locations in the database".format(len(locations)))
     locNameList = list(locations['locName'])
     outputPath = config.get("Output", "Path")
-    plotPath = pjoin(outputPath, "plots")
+    plotPath = pjoin(outputPath, "plots/")
     processPath = pjoin(outputPath, "process")
 
     fh = open(pjoin(processPath, "parameters.csv"), "w")
-    for loc in locNameList:
-        log.info("Running calculations for {0}".format(loc))
-        locId = locations['locId'][locNameList.index(loc)]
+    for locName in locNameList:
+        log.info("Running calculations for {0}".format(locName))
+        locId = locations['locId'][locNameList.index(locName)]
         recs = database.locationRecords(db, locId)
-        (mu, xi, sigma), (gpd) = run_fit(recs, locId, loc, plotPath)
+        (mu, xi, sigma), (gpd) = runFit(recs, locId, locName, numYears, plotPath)
         fh.write("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5}\n".
-                 format(loc, xi, sigma, mu, recs['wspd'].max()/2, gpd))
+                 format(locName, xi, sigma, mu, recs['wspd'].max()/2, gpd))
 
     fh.close()
-    
-    
+
+
 
 def startup():
     """
     Parse command line arguments and call the :func:`main` function.
     """
-    
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config_file',
                         help='Path to configuration file')
@@ -167,6 +173,6 @@ def startup():
             tblines = traceback.format_exc().splitlines()
             for line in tblines:
                 log.critical(line.lstrip())
-                
+
 if __name__ == "__main__":
     startup()
