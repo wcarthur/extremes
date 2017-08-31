@@ -9,7 +9,7 @@
 .. moduleauthor:: Craig Arthur <craig.arthur@ga.gov.au>
 
 """
-from __future__ import division
+from __future__ import division, print_function
 from itertools import product
 import logging
 
@@ -170,7 +170,7 @@ def nearestIndex(array, value):
     :type array: :class:`numpy.ndarray`
     :param value: value to find closest element of `array`.
     :type value: float or int
-    
+
     :returns: index of `array` that has the closest value to `value`.
     :rtype: int
     """
@@ -186,7 +186,7 @@ def gpdCalculateShape(mu, data):
     :param float mu: threshold parameter for the GPD distribution.
     :param data: :class:`numpy.ndarray` of data values to fit.
 
-    :returns: tuple of GPD parameters 
+    :returns: tuple of GPD parameters
               (threshold, shape, scale | mu, xi, sigma)
     """
     nobs = len(data)
@@ -199,33 +199,33 @@ def gpdCalculateShape(mu, data):
 def gpdSelectThreshold(data, nexc=5):
     """
     Select an appropriate threshold for fitting a Generalised Pareto
-    Distribution, using the approach described by Sanabria and Cechet (2007). 
-    
-    The only constraint placed on the selection is that the shape 
+    Distribution, using the approach described by Sanabria and Cechet (2007).
+
+    The only constraint placed on the selection is that the shape
     parameter is negative (such that the distribution is bounded).
-    
-    :param data: :class:`numpy.ndarray` containing data values (with 
+
+    :param data: :class:`numpy.ndarray` containing data values (with
                  missing values removed).
     :param int nexc: Minimum number of data points exceeding the threshold for
                      a fit to be performed.
     :returns: tuple of the shape, scale and threshold.
-    
+
     References: Sanabria, L. A. and Cechet, R. P. (2007), *A Statistical
                 Model of Severe Winds*. Geoscience Australia Record 2007/12.
     """
-    
+
     sh = []
     sc = []
     t = []
     q1000list = []
     q10000list = []
-    
+
     eps = -0.01
     datamax = data.max()
     nobs = len(data)
     startmu = data.compress(data > 0).max()/2
     for mu in np.arange(startmu, datamax, 0.05):
-        numexceed = len(data[data > mu]) 
+        numexceed = len(data[data > mu])
         rate = numexceed / nobs
         if numexceed < nexc:
             break
@@ -240,7 +240,7 @@ def gpdSelectThreshold(data, nexc=5):
             continue
 
         qdiff = np.abs(q10000 - q1000)
-        
+
         # If the shape parameter is negative, the difference between
         # the 1000- and 10000-year return period values is less than
         # 12%, and the difference is positive, then we store
@@ -254,7 +254,7 @@ def gpdSelectThreshold(data, nexc=5):
             sc.append(pp[2])
             q1000list.append(q1000)
             q10000list.append(q10000)
-            
+
     # If there are no valid threshold values, then return zeros:
     if len(t) == 0:
         print("No suitable shape parameters identified")
@@ -271,7 +271,7 @@ def gpdSelectThreshold(data, nexc=5):
 
     idx1000 = nearestIndex(np.array(q1000list), Av1000)
     idx10000 = nearestIndex(np.array(q10000list), Av10000)
-    
+
     u1000 = t[idx1000]
     u10000 = t[idx10000]
 
