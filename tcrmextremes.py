@@ -16,7 +16,7 @@ from extremes import gpdSelectThreshold, returnLevels, empReturnPeriod
 
 from Utilities.files import flStartLog, flConfigFile
 from Utilities.config import ConfigParser
-from Utilitie.parallel import attemptParallel
+from Utilities.parallel import attemptParallel
 from Utilities.version import version
 
 import seaborn as sns
