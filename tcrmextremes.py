@@ -16,6 +16,8 @@ from extremes import gpdSelectThreshold, returnLevels, empReturnPeriod
 
 from Utilities.files import flStartLog, flConfigFile
 from Utilities.config import ConfigParser
+from Utilitie.parallel import attemptParallel
+from Utilities.version import version
 
 import seaborn as sns
 sns.set_context("poster")
@@ -84,32 +86,107 @@ def runFit(recs, locId, locName, numYears, outputPath):
     fig.tight_layout()
     plt.savefig(pjoin(outputPath, "{0}.png".format(locId)))
     plt.close()
-    return (mu, xi, sigma), (gpd)
+    return locId, mu, xi, sigma, thresh, (gpd)
 
 def main(configFile):
+    """
+    Execute the fitting routine for all locations in the database.
+
+    """
     log.info("Running tcrmextremes")
     config = ConfigParser()
     config.read(configFile)
     numYears = config.getint('TrackGenerator', 'NumSimulations')
-
-    db = database.HazardDatabase(configFile)
-    locations = db.getLocations()
-    log.info("There are {0} locations in the database".format(len(locations)))
-    locNameList = list(locations['locName'])
     outputPath = config.get("Output", "Path")
     plotPath = pjoin(outputPath, "plots/")
     processPath = pjoin(outputPath, "process")
 
-    fh = open(pjoin(processPath, "parameters.csv"), "w")
-    for locName in locNameList:
-        log.info("Running calculations for {0}".format(locName))
-        locId = locations['locId'][locNameList.index(locName)]
-        recs = database.locationRecords(db, locId)
-        (mu, xi, sigma), (gpd) = runFit(recs, locId, locName, numYears, plotPath)
-        fh.write("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5}\n".
-                 format(locName, xi, sigma, mu, recs['wspd'].max()/2, gpd))
+    pp.barrier()
 
-    fh.close()
+    work_tag = 0
+    result_tag = 1
+
+    # On the head node:
+    if (pp.rank() == 0) and (pp.size() > 1):
+        db = database.HazardDatabase(configFile)
+        locations = db.getLocations()
+        log.info("There are {0} locations in the database".\
+                 format(len(locations)))
+        locNameList = list(locations['locName'])
+        fh = open(pjoin(processPath, "parameters.csv"), "w")
+        w = 0
+        p = pp.size() - 1
+
+        for d in range(1, pp.size()):
+            if w < len(locations):
+                locName = locNameList[w]
+                locId = locations['locId'][locNameList.index(locName)]
+                log.info("Running calculations for {0}".format(locName))
+                recs = database.locationRecords(db, locId)
+                args = (recs, locId, locName, numYears, plotPath)
+                pp.send(args, w, destination=d, tag=work_tag)
+                w += 1
+            else:
+                pp.send(None, destination=d, tag=work_tag)
+                p = w
+
+        terminated = 0
+
+        while terminated < p:
+            result, status = pp.receive(pp.any_source, tag=result_tag,
+                                        return_status=True)
+            log.debug("Receiving results from node {0}".\
+                      format(status.source))
+            locId, mu, sigma, xi, thresh, gpd = result
+            locName = locations['locName'][locNameList.index(locId)]
+            fh.write("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5}\n".
+                     format(locName, xi, sigma, mu, thresh, gpd))
+
+            d = status.source
+            if w < len(locNameList):
+                locName = locNameList[w]
+                locId = locations['locId'][locNameList.index(locName)]
+                log.info("Running calculations for {0}".format(locName))
+                recs = database.locationRecords(db, locId)
+                args = (recs, locId, locName, numYears, plotPath)
+                pp.send(args, w, destination=d, tag=work_tag)
+                w += 1
+            else:
+                pp.send(None, destination=d, tag=work_tag)
+                terminated += 1
+
+    elif (pp.size() > 1) and (pp.rank() != 0):
+        while True:
+            args = pp.receive(source=0, tag=work_tag)
+            if args is None:
+                break
+
+            log.info("Processing {0} on node {1}".\
+                     format(args[2], pp.rank()))
+            result = runFit(*args)
+            pp.send(result, destination=0, tag=result_tag)
+
+    elif pp.size() == 1 and pp.rank() == 0:
+        # Assume no Pypar
+        db = database.HazardDatabase(configFile)
+        locations = db.getLocations()
+        log.info("There are {0} locations in the database".\
+                 format(len(locations)))
+        locNameList = list(locations['locName'])
+        fh = open(pjoin(processPath, "parameters.csv"), "w")
+
+        for locName in locNameList:
+            log.info("Running calculations for {0}".format(locName))
+            locId = locations['locId'][locNameList.index(locName)]
+            recs = database.locationRecords(db, locId)
+            args = (recs, locId, locName, numYears, plotPath)
+
+            locId, mu, sigma, xi, thresh, gpd =\
+                        runFit(recs, locId, locName, numYears, plotPath)
+            fh.write("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5}\n".
+                     format(locName, xi, sigma, mu, thresh, gpd))
+
+        fh.close()
 
 
 
@@ -151,7 +228,20 @@ def startup():
     if args.debug:
         debug = True
 
+    global pp
+    pp = attemptParallel()
+    import atexit
+    atexit.register(pp.finalize)
+
+    if pp.size() > 1 and pp.rank() > 0:
+        # MPI execution:
+        logfile += '-' + str(pp.rank())
+        verbose = False
+    else:
+        pass
+
     log = flStartLog(logfile, logLevel, verbose, datestamp)
+    log.info("Code version: {0}".format(version))
     import warnings
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     warnings.filterwarnings("ignore", category=UserWarning, module="pytz")
@@ -168,6 +258,9 @@ def startup():
             main(configFile)
         except ImportError as e:
             log.critical("Missing module: {0}".format(e.strerror))
+            tblines = traceback.format_exc().splitlines()
+            for line in tblines:
+                log.critical(line.lstrip())
         except Exception:  # pylint: disable=W0703
             # Catch any exceptions that occur and log them (nicely):
             tblines = traceback.format_exc().splitlines()
