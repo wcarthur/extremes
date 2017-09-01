@@ -277,7 +277,9 @@ def startup():
             for line in tblines:
                 log.critical(line.lstrip())
 
+    pp.barrier()
     log.info("Finished running {0}".format(sys.argv[0]))
+    pp.finalize()
 
 if __name__ == "__main__":
     startup()
