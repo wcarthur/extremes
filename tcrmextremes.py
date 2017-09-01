@@ -8,7 +8,11 @@ import traceback
 import argparse
 import database
 import numpy as np
+
+import matplotlib
+matplotlib.use('Agg', warn=False)  # Use matplotlib backend
 import matplotlib.pyplot as plt
+plt.ioff()
 
 from scipy.stats import genpareto
 
@@ -19,8 +23,7 @@ from Utilities.config import ConfigParser
 from Utilities.parallel import attemptParallel
 from Utilities.version import version
 
-import matplotlib
-matplotlib.use('Agg', warn=False)  # Use matplotlib backend
+
 import seaborn as sns
 sns.set_context("poster")
 sns.set_style("whitegrid")
