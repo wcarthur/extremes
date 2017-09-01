@@ -117,9 +117,11 @@ def main(configFile):
     work_tag = 0
     result_tag = 1
 
+    header = "locId, locName, it_scale, it_shape, it_thresh, gpd_shape, gpd_thresh, gpd_scale\n"
     # On the head node:
     if (pp.rank() == 0) and (pp.size() > 1):
         fh = open(pjoin(processPath, "parameters.csv"), "w")
+        fh.write(header)
         w = 0
         p = pp.size() - 1
 
@@ -144,10 +146,8 @@ def main(configFile):
                       format(status.source))
             locId, mu, sigma, xi, thresh, gpd = result
             locName = locations['locName'][locIdList.index(locId)]
-            fh.write("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5:.5f}, {6:.5f}, {7:.5f}\n".
-                     format(locName, xi, sigma, mu, thresh, *gpd))
-            log.info("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5:.5f}, {6:.5f}, {7:.5f}\n".
-                     format(locName, xi, sigma, mu, thresh, *gpd))
+            fh.write("{0}, {1}, {2:.5f}, {3:.5f}, {4:.5f}, {5:.5f}, {6:.5f}, {7:.5f}\n".
+                     format(locId, locName, sigma, mu, xi, *gpd))
             d = status.source
             if w < len(locNameList):
                 locName = locNameList[w]
@@ -193,8 +193,8 @@ def main(configFile):
 
             locId, mu, sigma, xi, thresh, gpd =\
                         runFit(recs, locId, locName, numYears, plotPath)
-            fh.write("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5}\n".
-                     format(locName, xi, sigma, mu, thresh, gpd))
+            fh.write("{0}, {1}, {2:.5f}, {3:.5f}, {4:.5f}, {5:.5f}, {6:.5f}, {7:.5f}\n".
+                     format(locId, locName, sigma, mu, xi, *gpd))
 
         fh.close()
 
