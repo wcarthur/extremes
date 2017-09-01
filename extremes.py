@@ -223,6 +223,9 @@ def gpdSelectThreshold(data, nexc=10):
     eps = -0.01
     datamax = data.max()
     nobs = len(data)
+    if len(data.compress(data > 0)) == 0:
+        LOG.warn("All data for threshold selection are zero - exiting")
+        return 0, 0, 0
     startmu = data.compress(data > 0).max()/2
     for mu in np.arange(startmu, datamax, 0.05):
         numexceed = len(data[data > mu])
@@ -257,7 +260,7 @@ def gpdSelectThreshold(data, nexc=10):
 
     # If there are no valid threshold values, then return zeros:
     if len(t) == 0:
-        print("No suitable shape parameters identified")
+        LOG.warn("No suitable shape parameters identified")
         return 0, 0, 0
 
     # Take the average value of the 1000- and 10000-year return period
