@@ -19,6 +19,8 @@ from Utilities.config import ConfigParser
 from Utilities.parallel import attemptParallel
 from Utilities.version import version
 
+import matplotlib
+matplotlib.use('Agg', warn=False)  # Use matplotlib backend
 import seaborn as sns
 sns.set_context("poster")
 sns.set_style("whitegrid")
