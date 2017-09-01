@@ -118,11 +118,6 @@ def main(configFile):
 
     # On the head node:
     if (pp.rank() == 0) and (pp.size() > 1):
-        #db = database.HazardDatabase(configFile)
-        #locations = db.getLocations()
-        #log.info("There are {0} locations in the database".\
-        #         format(len(locations)))
-        #locNameList = list(locations['locName'])
         fh = open(pjoin(processPath, "parameters.csv"), "w")
         w = 0
         p = pp.size() - 1
@@ -163,6 +158,9 @@ def main(configFile):
                 pp.send(None, destination=d, tag=work_tag)
                 terminated += 1
 
+        fh.close()
+
+    # On the worker nodes:
     elif (pp.size() > 1) and (pp.rank() != 0):
         while True:
             args = pp.receive(source=0, tag=work_tag)
