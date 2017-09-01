@@ -100,7 +100,11 @@ def main(configFile):
     outputPath = config.get("Output", "Path")
     plotPath = pjoin(outputPath, "plots/")
     processPath = pjoin(outputPath, "process")
-
+    db = database.HazardDatabase(configFile)
+    locations = db.getLocations()
+    log.info("There are {0} locations in the database".\
+             format(len(locations)))
+    locNameList = list(locations['locName'])
     pp.barrier()
 
     work_tag = 0
@@ -108,11 +112,11 @@ def main(configFile):
 
     # On the head node:
     if (pp.rank() == 0) and (pp.size() > 1):
-        db = database.HazardDatabase(configFile)
-        locations = db.getLocations()
-        log.info("There are {0} locations in the database".\
-                 format(len(locations)))
-        locNameList = list(locations['locName'])
+        #db = database.HazardDatabase(configFile)
+        #locations = db.getLocations()
+        #log.info("There are {0} locations in the database".\
+        #         format(len(locations)))
+        #locNameList = list(locations['locName'])
         fh = open(pjoin(processPath, "parameters.csv"), "w")
         w = 0
         p = pp.size() - 1
@@ -122,8 +126,7 @@ def main(configFile):
                 locName = locNameList[w]
                 locId = locations['locId'][locNameList.index(locName)]
                 log.info("Running calculations for {0}".format(locName))
-                recs = database.locationRecords(db, locId)
-                args = (recs, locId, locName, numYears, plotPath)
+                args = (locId, locName, numYears, plotPath)
                 pp.send(args, destination=d, tag=work_tag)
                 w += 1
             else:
@@ -147,8 +150,7 @@ def main(configFile):
                 locName = locNameList[w]
                 locId = locations['locId'][locNameList.index(locName)]
                 log.info("Running calculations for {0}".format(locName))
-                recs = database.locationRecords(db, locId)
-                args = (recs, locId, locName, numYears, plotPath)
+                args = (locId, locName, numYears, plotPath)
                 pp.send(args, destination=d, tag=work_tag)
                 w += 1
             else:
@@ -161,9 +163,11 @@ def main(configFile):
             if args is None:
                 break
 
+            locId, locName, numYears, plotPath = args
             log.info("Processing {0} on node {1}".\
-                     format(args[2], pp.rank()))
-            result = runFit(*args)
+                     format(args[1], pp.rank()))
+            recs = database.locationRecords(db, locId)
+            result = runFit(recs, locId, locName, numYears, plotPath)
             pp.send(result, destination=0, tag=result_tag)
 
     elif pp.size() == 1 and pp.rank() == 0:
