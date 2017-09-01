@@ -110,6 +110,7 @@ def main(configFile):
     log.info("There are {0} locations in the database".\
              format(len(locations)))
     locNameList = list(locations['locName'])
+    locIdList = list(locations['locId'])
     pp.barrier()
 
     work_tag = 0
@@ -146,7 +147,7 @@ def main(configFile):
             log.debug("Receiving results from node {0}".\
                       format(status.source))
             locId, mu, sigma, xi, thresh, gpd = result
-            locName = locations['locName'][locNameList.index(locId)]
+            locName = locations['locName'][locIdList.index(locId)]
             fh.write("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5}\n".
                      format(locName, xi, sigma, mu, thresh, gpd))
 
