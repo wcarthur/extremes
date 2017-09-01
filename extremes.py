@@ -196,7 +196,7 @@ def gpdCalculateShape(mu, data):
 
     return gpd
 
-def gpdSelectThreshold(data, nexc=5):
+def gpdSelectThreshold(data, nexc=10):
     """
     Select an appropriate threshold for fitting a Generalised Pareto
     Distribution, using the approach described by Sanabria and Cechet (2007).

@@ -38,7 +38,7 @@ def runFit(recs, locId, locName, numYears, outputPath):
     log.info("Processing {0}".format(locName))
 
     # Run the threshold selection algorithm:
-    xi, sigma, mu = gpdSelectThreshold(recs['wspd'])
+    xi, sigma, mu = gpdSelectThreshold(recs['wspd'], nexc=10)
 
     # Determine a GPD fit using a fixed threshold (99.5 percentile):
     thresh = np.percentile(recs['wspd'], 99.5)
