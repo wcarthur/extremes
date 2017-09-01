@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 import os
 from os.path import join as pjoin, realpath, isdir, dirname
+import sys
 import logging as log
 import traceback
 
@@ -118,7 +119,7 @@ def main(configFile):
 
     # On the head node:
     if (pp.rank() == 0) and (pp.size() > 1):
-        fh = open(pjoin(processPath, "parameters.csv"), "w")
+        fh = open(pjoin(processPath, "parameters.csv"), "a")
         w = 0
         p = pp.size() - 1
 
@@ -143,9 +144,12 @@ def main(configFile):
                       format(status.source))
             locId, mu, sigma, xi, thresh, gpd = result
             locName = locations['locName'][locIdList.index(locId)]
+            fh = open(pjoin(processPath, "parameters.csv"), "a")
             fh.write("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5}\n".
                      format(locName, xi, sigma, mu, thresh, gpd))
-
+            fh.close()
+            log.info("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5}\n".
+                     format(locName, xi, sigma, mu, thresh, gpd))
             d = status.source
             if w < len(locNameList):
                 locName = locNameList[w]
@@ -274,6 +278,8 @@ def startup():
             tblines = traceback.format_exc().splitlines()
             for line in tblines:
                 log.critical(line.lstrip())
+
+    log.info("Finished running {0}".format(sys.argv[0]))
 
 if __name__ == "__main__":
     startup()

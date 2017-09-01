@@ -21,7 +21,7 @@ class TestSelection(unittest.TestCase):
         self.assertTrue(np.alltrue(np.equal(result, self.emptyResult)))
 
     def test_nexceed(self):
-        """Test that len(data)<nexc gives zeros as result"""
+        """Test that len(data) < nexc gives zeros as result"""
         data = np.ones(10)
         result = gpdSelectThreshold(data, nexc=20)
         self.assertEqual(type(result), type(self.emptyResult))
