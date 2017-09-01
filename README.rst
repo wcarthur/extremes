@@ -12,7 +12,7 @@ first method is the `fit` method available in all
 `scipy.stats.rv_continuous` distributions, which uses maximum
 likelihood estimates for the fitting. The second method is described
 by `Sanabria &
-Cechet<https://www.google.com.au/url?sa=t&rct=j&q=&esrc=s&source=web&cd=4&cad=rja&uact=8&ved=0ahUKEwidmJn0lYPWAhUKwLwKHX22Ah0QFggxMAM&url=https%3A%2F%2Fd28rz98at9flks.cloudfront.net%2F65052%2FRec2007_012.pdf&usg=AFQjCNFKAeLHHq0eKZ7Q--9zm6sxWXWJuA>`_
+Cechet <https://www.google.com.au/url?sa=t&rct=j&q=&esrc=s&source=web&cd=4&cad=rja&uact=8&ved=0ahUKEwidmJn0lYPWAhUKwLwKHX22Ah0QFggxMAM&url=https%3A%2F%2Fd28rz98at9flks.cloudfront.net%2F65052%2FRec2007_012.pdf&usg=AFQjCNFKAeLHHq0eKZ7Q--9zm6sxWXWJuA>`_
 (2007), which applies an iterative sampling technique to determine the
 optimum threshold parameter for the GPD.
 

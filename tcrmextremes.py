@@ -119,7 +119,7 @@ def main(configFile):
 
     # On the head node:
     if (pp.rank() == 0) and (pp.size() > 1):
-        fh = open(pjoin(processPath, "parameters.csv"), "a")
+        fh = open(pjoin(processPath, "parameters.csv"), "w")
         w = 0
         p = pp.size() - 1
 
@@ -144,12 +144,10 @@ def main(configFile):
                       format(status.source))
             locId, mu, sigma, xi, thresh, gpd = result
             locName = locations['locName'][locIdList.index(locId)]
-            fh = open(pjoin(processPath, "parameters.csv"), "a")
-            fh.write("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5}\n".
-                     format(locName, xi, sigma, mu, thresh, gpd))
-            fh.close()
-            log.info("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5}\n".
-                     format(locName, xi, sigma, mu, thresh, gpd))
+            fh.write("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5:.5f}, {6:.5f}, {7:.5f}\n".
+                     format(locName, xi, sigma, mu, thresh, *gpd))
+            log.info("{0}, {1:.5f}, {2:.5f}, {3:.5f}, {4:.5f}, {5:.5f}, {6:.5f}, {7:.5f}\n".
+                     format(locName, xi, sigma, mu, thresh, *gpd))
             d = status.source
             if w < len(locNameList):
                 locName = locNameList[w]
