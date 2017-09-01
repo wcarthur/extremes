@@ -124,7 +124,7 @@ def main(configFile):
                 log.info("Running calculations for {0}".format(locName))
                 recs = database.locationRecords(db, locId)
                 args = (recs, locId, locName, numYears, plotPath)
-                pp.send(args, w, destination=d, tag=work_tag)
+                pp.send(args, destination=d, tag=work_tag)
                 w += 1
             else:
                 pp.send(None, destination=d, tag=work_tag)
@@ -149,7 +149,7 @@ def main(configFile):
                 log.info("Running calculations for {0}".format(locName))
                 recs = database.locationRecords(db, locId)
                 args = (recs, locId, locName, numYears, plotPath)
-                pp.send(args, w, destination=d, tag=work_tag)
+                pp.send(args, destination=d, tag=work_tag)
                 w += 1
             else:
                 pp.send(None, destination=d, tag=work_tag)
@@ -241,7 +241,7 @@ def startup():
         pass
 
     log = flStartLog(logfile, logLevel, verbose, datestamp)
-    log.info("Code version: {0}".format(version))
+    log.info("Code version: {0}".format(version()))
     import warnings
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     warnings.filterwarnings("ignore", category=UserWarning, module="pytz")
