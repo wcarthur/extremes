@@ -121,7 +121,7 @@ def main(configFile):
                    500, 1000, 2000, 5000, 10000])
     paramheader = "locId, locName, it_scale, it_shape, it_thresh, it_rate, gpd_rate, gpd_shape, gpd_thresh, gpd_scale\n"
     paramfmt = "{0}, {1}, " + ", ".join(["{:.5f}"] * 8)
-    rvalheader = "locId, locName, " + ", ".join(["{:d}"]*len(rp).format(*rp))
+    rvalheader = "locId, locName, " + ", ".join(["{:d}"]*len(rp)).format(*rp)
     rvalfmt = "{0}, {1}" + ", ".join(["{:.5f}"] * len(rp))
     # On the head node:
     if (pp.rank() == 0) and (pp.size() > 1):
@@ -294,6 +294,10 @@ def startup():
             tblines = traceback.format_exc().splitlines()
             for line in tblines:
                 log.critical(line.lstrip())
+            # Gracefully handle failure on parallel execution:
+            if pp.size() > 1:
+                for d in range(1, pp.size()):
+                    pp.send(None, destination=d, tag=0)
 
     pp.barrier()
     log.info("Finished running {0}".format(sys.argv[0]))
