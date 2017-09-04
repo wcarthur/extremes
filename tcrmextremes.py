@@ -123,7 +123,7 @@ def main(configFile):
                    " gpd_rate, gpd_shape, gpd_thresh, gpd_scale\n")
     paramfmt = "{}, {}, " + ", ".join(["{:.5f}"] * 8)
     rvalheader = "locId, locName, " + ", ".join(["{:d}"]*len(rp)).format(*rp)
-    rvalfmt = "{0}, {1}" + ", ".join(["{:.5f}"] * len(rp))
+    rvalfmt = "{}, {}" + ", ".join(["{:.5f}"] * len(rp))
     # On the head node:
     if (pp.rank() == 0) and (pp.size() > 1):
         fh = open(pjoin(processPath, "parameters.csv"), "w")
