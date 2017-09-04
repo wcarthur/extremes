@@ -119,8 +119,9 @@ def main(configFile):
 
     rp = np.array([1, 2, 5, 10, 20, 50, 100, 200,
                    500, 1000, 2000, 5000, 10000])
-    paramheader = "locId, locName, it_scale, it_shape, it_thresh, it_rate, gpd_rate, gpd_shape, gpd_thresh, gpd_scale\n"
-    paramfmt = "{0}, {1}, " + ", ".join(["{:.5f}"] * 8)
+    paramheader = ("locId, locName, it_scale, it_shape, it_thresh, it_rate,"
+                   " gpd_rate, gpd_shape, gpd_thresh, gpd_scale\n")
+    paramfmt = "{}, {}, " + ", ".join(["{:.5f}"] * 8)
     rvalheader = "locId, locName, " + ", ".join(["{:d}"]*len(rp)).format(*rp)
     rvalfmt = "{0}, {1}" + ", ".join(["{:.5f}"] * len(rp))
     # On the head node:
@@ -209,7 +210,7 @@ def main(configFile):
             locId, mu, sigma, xi, rate1, rval1, thresh, rate2, gpd, rval2 =\
                         runFit(recs, locId, locName, numYears, plotPath)
             
-            fh.write(fmt.format(locId, locName, sigma, mu, xi, rate1, rate2, *gpd))
+            fh.write(paramfmt.format(locId, locName, sigma, mu, xi, rate1, rate2, *gpd))
             rval1fh.write(rvalfmt.format(locId, locName, *rval1))
             rval2fh.write(rvalfmt.format(locId, locName, *rval2))
 
