@@ -121,9 +121,9 @@ def main(configFile):
                    500, 1000, 2000, 5000, 10000])
     paramheader = ("locId, locName, it_scale, it_shape, it_thresh, it_rate,"
                    " gpd_rate, gpd_shape, gpd_thresh, gpd_scale\n")
-    paramfmt = "{}, {}, " + ", ".join(["{:.5f}"] * 8) + "\n"
+    paramfmt = "{}, {}, " + ", ".join(["{:.7f}"] * 8) + "\n"
     rvalheader = "locId, locName, " + ", ".join(["{:d}"]*len(rp)).format(*rp) + "\n"
-    rvalfmt = "{}, {}, " + ", ".join(["{:.5f}"] * len(rp)) + "\n"
+    rvalfmt = "{}, {}, " + ", ".join(["{:.2f}"] * len(rp)) + "\n"
     # On the head node:
     if (pp.rank() == 0) and (pp.size() > 1):
         fh = open(pjoin(processPath, "parameters.csv"), "w")
