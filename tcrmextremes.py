@@ -156,7 +156,7 @@ def main(configFile):
                       format(status.source))
             locId, mu, sigma, xi, rate1, rval1, thresh, rate2, gpd, rval2 = result
             locName = locations['locName'][locIdList.index(locId)]
-            fh.write(paramfmt.format(locId, locName, sigma, mu, xi, rate, rate2, *gpd))
+            fh.write(paramfmt.format(locId, locName, sigma, mu, xi, rate1, rate2, *gpd))
             rval1fh.write(rvalfmt.format(locId, locName, *rval1))
             rval2fh.write(rvalfmt.format(locId, locName, *rval2))
             d = status.source
@@ -195,7 +195,11 @@ def main(configFile):
                  format(len(locations)))
         locNameList = list(locations['locName'])
         fh = open(pjoin(processPath, "parameters.csv"), "w")
-
+        rval1fh = open(pjoin(processPath, "iterative_rl.csv"), "w")
+        rval2fh = open(pjoin(processPath, "fitted_rl.csv"), "w")
+        fh.write(paramheader)
+        rval1fh.write(rvalheader)
+        rval2fh.write(rvalheader)
         for locName in locNameList:
             log.info("Running calculations for {0}".format(locName))
             locId = locations['locId'][locNameList.index(locName)]
