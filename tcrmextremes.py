@@ -92,7 +92,7 @@ def runFit(recs, locId, locName, numYears, outputPath):
     fig.tight_layout()
     plt.savefig(pjoin(outputPath, "{0}.png".format(locId)))
     plt.close()
-    return locId, mu, xi, sigma, thresh, (gpd)
+    return locId, mu, xi, sigma, rate, thresh, rate2, (gpd)
 
 def main(configFile):
     """
@@ -117,7 +117,8 @@ def main(configFile):
     work_tag = 0
     result_tag = 1
 
-    header = "locId, locName, it_scale, it_shape, it_thresh, gpd_shape, gpd_thresh, gpd_scale\n"
+    header = "locId, locName, it_scale, it_shape, it_thresh, it_rate, gpd_rate, gpd_shape, gpd_thresh, gpd_scale\n"
+    fmt = "{0}, {1}, " + ", ".join(["{:.5f}"] * 8)
     # On the head node:
     if (pp.rank() == 0) and (pp.size() > 1):
         fh = open(pjoin(processPath, "parameters.csv"), "w")
@@ -144,10 +145,9 @@ def main(configFile):
                                         return_status=True)
             log.debug("Receiving results from node {0}".\
                       format(status.source))
-            locId, mu, sigma, xi, thresh, gpd = result
+            locId, mu, sigma, xi, rate1, thresh, rate2, gpd = result
             locName = locations['locName'][locIdList.index(locId)]
-            fh.write("{0}, {1}, {2:.5f}, {3:.5f}, {4:.5f}, {5:.5f}, {6:.5f}, {7:.5f}\n".
-                     format(locId, locName, sigma, mu, xi, *gpd))
+            fh.write(fmt.format(locId, locName, sigma, mu, xi, rate, rate2, *gpd))
             d = status.source
             if w < len(locNameList):
                 locName = locNameList[w]
@@ -191,10 +191,9 @@ def main(configFile):
             recs = database.locationRecords(db, locId)
             args = (recs, locId, locName, numYears, plotPath)
 
-            locId, mu, sigma, xi, thresh, gpd =\
+            locId, mu, sigma, xi, rate1, thresh, rate2, gpd =\
                         runFit(recs, locId, locName, numYears, plotPath)
-            fh.write("{0}, {1}, {2:.5f}, {3:.5f}, {4:.5f}, {5:.5f}, {6:.5f}, {7:.5f}\n".
-                     format(locId, locName, sigma, mu, xi, *gpd))
+            fh.write(fmt.format(locId, locName, sigma, mu, xi, rate1, rate2, *gpd))
 
         fh.close()
 
