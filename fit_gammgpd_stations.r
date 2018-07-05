@@ -17,7 +17,7 @@ outdir = "C:/WorkSpace/data/derived/daily_max_wind_gust/output/"
 setwd(indir)
 print(paste("Indir = ", indir ,sep = "") )
 
-stationFile <- paste(indir, "DC02D_StnDet_999999999425050.txt", sep = "")
+stationFile <- paste(indir, "StnDetails.txt", sep = "")
 
 stations <- read.table(stationFile, sep = ",", header = T)
 nstns <- length(stations$Station.Name)
@@ -54,18 +54,27 @@ for (i in 1:nstns) {
     ws = ws/3.6
 
     # Create the fit environment for the dataset:
-    fitenv = fit_gpd_mixture(data = ws,
-                             gpd_threshold_quantile_range = c(0.95, 0.995))
-
+    fitenv = tryCatch(fit_gpd_mixture(data = ws,
+                      gpd_threshold_quantile_range = c(0.95, 0.995)),
+                      error=function(e) print("Failed to fit GPD mixture"),
+                      finally=print("passed"))
+    if(inherits(fitenv, "error")) next
     # Run the MCMC fitting routine:
-    mcmc_gpd_mixture(fitenv, annual_event_rate = 365.)
+    possErr = tryCatch(mcmc_gpd_mixture(fitenv, annual_event_rate = 365.,
+                              mcmc_nchains = 1,
+                              mcmc_length = 10000,
+                              mcmc_burnin = 1000),
+             error = function(e) print ("Failed MCMC stage"),
+             finally = print("Done MCMC fitting"))
 
+    if(inherits(possErr, "error")) next
     # Create the plot of ARI values
     print("Plotting return levels with Bayesian credible intervals")
     png(paste(outdir,toString(stnNum), "_mcmc_ari.png", sep = ""),
          width = 640, height = 640)
     plot.new()
-    mcmc_rl_plot(fitenv, xlim = c(10, 0.01))
+    printErr = tryCatch(mcmc_rl_plot(fitenv, xlim = c(10, 0.01)), error=function(e) print("Failed to plot") )
+    if(inherits(printErr, "error")) next
     dev.off()
 
     # Set an initial threshold for estimating the most suitable threshold
