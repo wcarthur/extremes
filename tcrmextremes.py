@@ -17,7 +17,7 @@ plt.ioff()
 
 from scipy.stats import genpareto
 
-from extremes import gpdSelectThreshold, returnLevels, empReturnPeriod
+from extremes import gpdSelectThreshold, returnLevels, empReturnPeriod, calculateUncertainty
 
 from Utilities.files import flStartLog, flConfigFile
 from Utilities.config import ConfigParser
@@ -62,18 +62,24 @@ def runFit(recs, locId, locName, numYears, outputPath):
     rval2 = returnLevels(rp, thresh, gpd[0], gpd[2], rate2)
 
     emprp = empReturnPeriod(data)
+
+    crp, lrp, urp = calculateUncertainty(recs['wspd'], rp, *gpd)
+    if crp is None:
+        return None
     sortedmax = np.sort(data)
     fig, ax1 = plt.subplots(1, 1)
-    ax1.semilogx(rp, rval, label="Fitted hazard curve")
-    ax1.semilogx(rp, rval2, label=r"$\mu$ = {0}".format(max(data)/2),
+    #ax1.semilogx(rp, rval, label=r"Iterative threshold $\mu$ = {0:.4f}".format(mu))
+    ax1.semilogx(rp, crp, label=r"Percentile threshold $\mu$ = {0:.4f}".format(thresh),
                  color='0.5')
+    ax1.semilogx(rp, lrp, label=r"90% CI", color='0.5', linestyle='--')
+    ax1.semilogx(rp, urp, color='0.5', linestyle='--')
     ax1.scatter(emprp[emprp > 1], sortedmax[emprp > 1], s=100,
                 color='r', label="Empirical ARI")
 
-    title_str = (locName   + "\n" +
-                 r"$\mu$ = {0:.3f}, $\xi$ = {1:.5f}, $\sigma$ = {2:.4f}".
-                 format(mu, xi, sigma))
-
+    #title_str = (locName   + "\n" +
+    #             r"$\mu$ = {0:.3f}, $\xi$ = {1:.5f}, $\sigma$ = {2:.4f}".
+    #             format(mu, xi, sigma))
+    title_str = locName
     ax1.set_title(title_str)
     ax1.set_ylim((0, 100))
     ax1.set_yticks(np.arange(0, 101, 10))
@@ -85,14 +91,58 @@ def runFit(recs, locId, locName, numYears, outputPath):
     ax1.axhline(45.6, c='lime', linestyle='--', linewidth=2)
     ax1.axhline(62.5, c='darkorange', linestyle='--', linewidth=2)
     ax1.axhline(77.8, c='darkred', linestyle='--', linewidth=2)
-    ax1.text(20000, 45.6, 'Cat 3', ha='center')
-    ax1.text(20000, 62.5, 'Cat 4', ha='center')
-    ax1.text(20000, 77.8, 'Cat 5', ha='center')
+    ax1.text(15000, 45.6, 'Cat 3', ha='center')
+    ax1.text(15000, 62.5, 'Cat 4', ha='center')
+    ax1.text(15000, 77.8, 'Cat 5', ha='center')
     ax1.legend(loc=2)
     fig.tight_layout()
-    plt.savefig(pjoin(outputPath, "{0}.png".format(locId)))
+    plt.savefig(pjoin(outputPath, "{0}.png".format(locId)), 
+                bbox_inches="tight")
     plt.close()
-    return locId, mu, xi, sigma, rate, rval, thresh, rate2, (gpd), rval2
+    return locId, mu, xi, sigma, rate, rval, thresh, rate2, (gpd), rval2, lrp, urp
+
+def processCI(recs, locId, locName, numYears, outputPath):
+    wspd = recs['wspd'][recs['wspd'] > 0]
+
+    data = np.zeros(365.25 * numYears)
+    data[-len(wspd):] = wspd
+    emprp = empReturnPeriod(data)
+
+    xi, sigma, mu = gpdSelectThreshold(wspd, nexc=10)
+    rate = float(len(data[data > mu])) / float(len(data))
+
+    threshold = np.percentile(wspd, 99.)
+    rate2 = float(len(data[data > threshold])) / float(len(data))
+    gpd = genpareto.fit(wspd[wspd > threshold], loc=threshold)
+    years = np.array([1, 2, 5, 10, 20, 50, 100, 200,
+                      500, 1000, 2000, 5000, 10000])
+
+    crp, lrp, urp = calculateUncertainty(wspd[wspd > threshold], years, *gpd)
+    if crp is None:
+        return None
+    fig, ax = plt.subplots(1, 1)
+    ax.semilogx(years, crp, label="Fitted ARI")
+    ax.semilogx(years, lrp, '0.5', label=r"90% CI", ls='--')
+    ax.semilogx(years, urp, '0.5', ls='--')
+    ax.scatter(emprp[emprp > 1], data[emprp > 1], s=100,
+                     color='r', label = "Empirical ARI")
+
+    ax.set_ylim((0, 100))
+    ax.set_yticks(np.arange(0, 101, 10))
+    ax.set_xlim((1, 10000))
+    ax.set_ylabel('Wind speed (m/s)')
+    ax.set_xlabel('Average recurrence interval (years)')
+    ax.grid(which='major', linestyle='-')
+    ax.grid(which='minor', linestyle='--', linewidth=1)
+    ax.set_title("{0}".format(locName))
+    ax.legend(loc=2)
+    fig.tight_layout()
+    plt.savefig(pjoin(outputPath, "{0}.png".format(locId)), 
+                bbox_inches="tight")
+    plt.close()
+
+    return locId, mu, xi, sigma, rate, crp, threshold, rate2, (gpd), crp, lrp, urp
+
 
 def main(configFile):
     """
@@ -104,7 +154,7 @@ def main(configFile):
     config.read(configFile)
     numYears = config.getint('TrackGenerator', 'NumSimulations')
     outputPath = config.get("Output", "Path")
-    plotPath = pjoin(outputPath, "plots/")
+    plotPath = pjoin(outputPath, "plots/fit")
     processPath = pjoin(outputPath, "process")
     db = database.HazardDatabase(configFile)
     locations = db.getLocations()
@@ -119,9 +169,9 @@ def main(configFile):
 
     rp = np.array([1, 2, 5, 10, 20, 50, 100, 200,
                    500, 1000, 2000, 5000, 10000])
-    paramheader = ("locId, locName, it_scale, it_shape, it_thresh, it_rate,"
+    paramheader = ("locId, locName, it_shape, it_thresh, it_scale, it_rate,"
                    " gpd_rate, gpd_shape, gpd_thresh, gpd_scale\n")
-    paramfmt = "{}, {}, " + ", ".join(["{:.7f}"] * 8) + "\n"
+    paramfmt = "{}, {}, " + ", ".join(["{:.8f}"] * 8) + "\n"
     rvalheader = "locId, locName, " + ", ".join(["{:d}"]*len(rp)).format(*rp) + "\n"
     rvalfmt = "{}, {}, " + ", ".join(["{:.2f}"] * len(rp)) + "\n"
     # On the head node:
@@ -129,9 +179,13 @@ def main(configFile):
         fh = open(pjoin(processPath, "parameters.csv"), "w")
         rval1fh = open(pjoin(processPath, "iterative_rl.csv"), "w")
         rval2fh = open(pjoin(processPath, "fitted_rl.csv"), "w")
+        rvalufh = open(pjoin(processPath, "fitted_rl_u.csv"), "w")
+        rvallfh = open(pjoin(processPath, "fitted_rl_l.csv"), "w")
         fh.write(paramheader)
         rval1fh.write(rvalheader)
         rval2fh.write(rvalheader)
+        rvalufh.write(rvalheader)
+        rvallfh.write(rvalheader)
 
         w = 0
         p = pp.size() - 1
@@ -155,11 +209,17 @@ def main(configFile):
                                         return_status=True)
             log.debug("Receiving results from node {0}".\
                       format(status.source))
-            locId, mu, sigma, xi, rate1, rval1, thresh, rate2, gpd, rval2 = result
-            locName = locations['locName'][locIdList.index(locId)]
-            fh.write(paramfmt.format(locId, locName, sigma, mu, xi, rate1, rate2, *gpd))
-            rval1fh.write(rvalfmt.format(locId, locName, *rval1))
-            rval2fh.write(rvalfmt.format(locId, locName, *rval2))
+            if result is None:
+                pass
+            else:
+                locId, mu, sigma, xi, rate1, rval1, thresh, rate2, gpd, rval2, lrp, urp = result
+                locName = locations['locName'][locIdList.index(locId)]
+                fh.write(paramfmt.format(locId, locName, sigma, mu, xi, rate1, rate2, *gpd))
+                rval1fh.write(rvalfmt.format(locId, locName, *rval1))
+                rval2fh.write(rvalfmt.format(locId, locName, *rval2))
+                rvalufh.write(rvalfmt.format(locId, locName, *urp))
+                rvallfh.write(rvalfmt.format(locId, locName, *lrp))
+
             d = status.source
             if w < len(locNameList):
                 locName = locNameList[w]
@@ -185,7 +245,7 @@ def main(configFile):
             log.info("Processing {0} on node {1}".\
                      format(args[1], pp.rank()))
             recs = database.locationRecords(db, locId)
-            result = runFit(recs, locId, locName, numYears, plotPath)
+            result = processCI(recs, locId, locName, numYears, plotPath)
             pp.send(result, destination=0, tag=result_tag)
 
     elif pp.size() == 1 and pp.rank() == 0:
@@ -198,25 +258,36 @@ def main(configFile):
         fh = open(pjoin(processPath, "parameters.csv"), "w")
         rval1fh = open(pjoin(processPath, "iterative_rl.csv"), "w")
         rval2fh = open(pjoin(processPath, "fitted_rl.csv"), "w")
+        rvalufh = open(pjoin(processPath, "fitted_rl_u.csv"), "w")
+        rvallfh = open(pjoin(processPath, "fitted_rl_l.csv"), "w")
+
         fh.write(paramheader)
         rval1fh.write(rvalheader)
         rval2fh.write(rvalheader)
+        rvalufh.write(rvalheader)
+        rvallfh.write(rvalheader)
+
         for locName in locNameList:
             log.info("Running calculations for {0}".format(locName))
             locId = locations['locId'][locNameList.index(locName)]
             recs = database.locationRecords(db, locId)
             args = (recs, locId, locName, numYears, plotPath)
-
-            locId, mu, sigma, xi, rate1, rval1, thresh, rate2, gpd, rval2 =\
-                        runFit(recs, locId, locName, numYears, plotPath)
-            
-            fh.write(paramfmt.format(locId, locName, sigma, mu, xi, rate1, rate2, *gpd))
-            rval1fh.write(rvalfmt.format(locId, locName, *rval1))
-            rval2fh.write(rvalfmt.format(locId, locName, *rval2))
+            result = processCI(recs, locId, locName, numYears, plotPath)
+            if result is None:
+                continue
+            else:
+                locId, mu, sigma, xi, rate1, rval1, thresh, rate2, gpd, rval2, lrp, urp = result        
+                fh.write(paramfmt.format(locId, locName, sigma, mu, xi, rate1, rate2, *gpd))
+                rval1fh.write(rvalfmt.format(locId, locName, *rval1))
+                rval2fh.write(rvalfmt.format(locId, locName, *rval2))
+                rvalufh.write(rvalfmt.format(locId, locName, *urp))
+                rvallfh.write(rvalfmt.format(locId, locName, *lrp))
 
         fh.close()
         rval1fh.close()
         rval2fh.close()
+        rvalufh.close()
+        rvallfh.close()
 
 
 def startup():

@@ -12,11 +12,14 @@
 from __future__ import division, print_function
 from itertools import product
 import logging
+from functools import wraps
+import time
 
 import numpy as np
 from distributions import empiricalPDF
-from scipy.stats import genpareto
+from scipy.stats import genpareto, scoreatpercentile
 from scipy.optimize import curve_fit
+import lmfit
 
 LOG = logging.getLogger(__name__)
 
@@ -25,6 +28,26 @@ OBS_PER_YEAR = 365.25
 __all__ = ['returnLevels', 'empReturnPeriod', 'nearestIndex',
            'gpdCalculateShape', 'gpdSelectThreshold', 'gpdAsymptote',
            'returnPeriodUncertainty']
+
+def timer(f):
+    """
+    A simple timing decorator for the entire process.
+
+    """
+    @wraps(f)
+    def wrap(*args, **kwargs):
+        t1 = time.time()
+        res = f(*args, **kwargs)
+
+        tottime = time.time() - t1
+        msg = "%02d:%02d:%02d " % \
+          reduce(lambda ll, b : divmod(ll[0], b) + ll[1:],
+                        [(tottime,), 60, 60])
+
+        LOG.info("Time for {0}: {1}".format(f.func_name, msg) )
+        return res
+
+    return wrap
 
 def returnLevels(intervals, mu, xi, sigma, rate, npyr=OBS_PER_YEAR):
     """
@@ -196,6 +219,7 @@ def gpdCalculateShape(mu, data):
 
     return gpd
 
+@timer
 def gpdSelectThreshold(data, nexc=10):
     """
     Select an appropriate threshold for fitting a Generalised Pareto
@@ -308,3 +332,68 @@ def gpdAsymptote(mu, xi, sigma):
     limit = np.abs((mu - xi) / sigma)
 
     return limit
+
+def residual(p, x, y):
+    return genpareto.pdf(x, p['xi'], loc=p['mu'], scale=p['sig']) - y
+
+def calcSD(pars, cov, rate, npyr, intervals):
+    nsims = 1000
+    rps = np.zeros((nsims, len(intervals)))
+    for i in range(nsims):
+        try:
+            xi = pars[0] + np.random.normal(0, np.sqrt(cov[0,0]))
+            mu = pars[1] + np.random.normal(0, np.sqrt(cov[1,1]))
+            sig = pars[2] + np.random.normal(0, np.sqrt(cov[2,2]))
+            rps[i, : ] = mu + (sig / xi) * (np.power(intervals * npyr * rate, xi) - 1.)
+        except ValueError:
+            rps[i, : ] = np.zeros(len(intervals))
+
+    lowerrp = scoreatpercentile(rps, 5, axis=0)
+    upperrp = scoreatpercentile(rps, 95, axis=0)
+    return lowerrp, upperrp
+
+def calculateUncertainty(wspd, intervals, xi, mu, sig):
+    """
+    :param wspd: :class:`numpy.array` of wind speeds
+    :param float xi: initial guess for 
+    """
+    bins = np.arange(0.5, 100, 1)
+    n, bins = np.histogram(wspd, bins, normed=True)
+    centres = 0.5*(bins[1:]+bins[:-1])
+    try:
+        pars,cov = curve_fit(lambda x, xi, mu, sig: genpareto.pdf(x, xi, loc=mu, 
+                                                                  scale=sig), 
+                             centres, n, p0=[0, np.mean(wspd), np.mean(wspd)], 
+                             maxfev=10000 )
+    except RuntimeError as e:
+        LOG.warn(e)
+        return None, None, None
+
+    gpd = genpareto.fit(wspd, floc=mu)
+    npyr = 365.25
+
+    p = lmfit.Parameters()
+    p.add_many(('xi', gpd[0], True, -np.inf, 2.),
+               ('mu', gpd[1]),
+               ('sig', gpd[2]))
+
+    mini = lmfit.Minimizer(residual, p, fcn_args=(centres, n),
+                           nan_policy='omit')
+
+    # first solve with Nelder-Mead
+    out1 = mini.minimize(method='Nelder')
+    out2 = mini.minimize(method='leastsq', params=out1.params)
+
+    if hasattr(out2, 'covar'):
+
+        cmu = out2.params['mu'].value
+        cxi = out2.params['xi'].value
+        csig = out2.params['sig'].value
+        rate = len(wspd)/(npyr*10000)
+        crp = cmu + (csig / cxi) * (np.power(intervals * npyr * rate, cxi) - 1.)
+        lrp, urp = calcSD((cxi, cmu, csig), out2.covar, rate, npyr, intervals)
+        return crp, lrp, urp
+
+    else:
+        LOG.warn("No covariance matrix from the minimizer")
+        return None, None, None
