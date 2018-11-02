@@ -392,7 +392,7 @@ def calculateUncertainty(wspd, intervals, xi, mu, sig):
         rate = len(wspd)/(npyr*10000)
         crp = cmu + (csig / cxi) * (np.power(intervals * npyr * rate, cxi) - 1.)
         lrp, urp = calcSD((cxi, cmu, csig), out2.covar, rate, npyr, intervals)
-        return crp, lrp, urp
+        return (cxi, cmu, csig), crp, lrp, urp
 
     else:
         LOG.warn("No covariance matrix from the minimizer")

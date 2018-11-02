@@ -63,7 +63,7 @@ def runFit(recs, locId, locName, numYears, outputPath):
 
     emprp = empReturnPeriod(data)
 
-    crp, lrp, urp = calculateUncertainty(recs['wspd'], rp, *gpd)
+    params, crp, lrp, urp = calculateUncertainty(recs['wspd'], rp, *gpd)
     if crp is None:
         return None
     sortedmax = np.sort(data)
@@ -99,7 +99,7 @@ def runFit(recs, locId, locName, numYears, outputPath):
     plt.savefig(pjoin(outputPath, "{0}.png".format(locId)), 
                 bbox_inches="tight")
     plt.close()
-    return locId, mu, xi, sigma, rate, rval, thresh, rate2, (gpd), rval2, lrp, urp
+    return locId, mu, xi, sigma, rate, rval, thresh, rate2, (params), rval2, lrp, urp
 
 def processCI(recs, locId, locName, numYears, outputPath):
     wspd = recs['wspd'][recs['wspd'] > 0]
@@ -117,7 +117,7 @@ def processCI(recs, locId, locName, numYears, outputPath):
     years = np.array([1, 2, 5, 10, 20, 50, 100, 200,
                       500, 1000, 2000, 5000, 10000])
 
-    crp, lrp, urp = calculateUncertainty(wspd[wspd > threshold], years, *gpd)
+    params, crp, lrp, urp = calculateUncertainty(wspd[wspd > threshold], years, *gpd)
     if crp is None:
         return None
     fig, ax = plt.subplots(1, 1)
@@ -141,7 +141,7 @@ def processCI(recs, locId, locName, numYears, outputPath):
                 bbox_inches="tight")
     plt.close()
 
-    return locId, mu, xi, sigma, rate, crp, threshold, rate2, (gpd), crp, lrp, urp
+    return locId, mu, xi, sigma, rate, crp, threshold, rate2, (params), crp, lrp, urp
 
 
 def main(configFile):
