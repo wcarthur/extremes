@@ -1,5 +1,3 @@
-from __future__ import print_function, division
-
 import os
 from os.path import join as pjoin, realpath, isdir, dirname
 import sys
@@ -13,6 +11,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg', warn=False)  # Use matplotlib backend
 import matplotlib.pyplot as plt
+from matplotlib.ticker import ScalarFormatter, LogLocator, NullFormatter
 plt.ioff()
 
 from scipy.stats import genpareto
@@ -26,9 +25,14 @@ from Utilities.version import version
 
 
 import seaborn as sns
-sns.set_context("poster")
+#sns.set_context("poster")
 sns.set_style("whitegrid")
 
+majloc = LogLocator()
+minloc = LogLocator(base=10.0, subs=np.arange(0.1, 1, 0.1), numticks=12)
+
+mpl_logger = log.getLogger('matplotlib')
+mpl_logger.setLevel(log.WARNING)
 
 def runFit(recs, locId, locName, numYears, outputPath):
     """
@@ -42,7 +46,7 @@ def runFit(recs, locId, locName, numYears, outputPath):
     xi, sigma, mu = gpdSelectThreshold(recs['wspd'], nexc=10)
 
     # Determine a GPD fit using a fixed threshold (99.5 percentile):
-    thresh = np.percentile(recs['wspd'], 99.5)
+    thresh = np.percentile(recs['wspd'], 99.9)
     gpd = genpareto.fit(recs['wspd'][recs['wspd'] > thresh], floc=thresh)
 
     data = np.zeros(int(numYears * 365.25))
@@ -67,8 +71,8 @@ def runFit(recs, locId, locName, numYears, outputPath):
     if crp is None:
         return None
     sortedmax = np.sort(data)
-    fig, ax1 = plt.subplots(1, 1)
-    #ax1.semilogx(rp, rval, label=r"Iterative threshold $\mu$ = {0:.4f}".format(mu))
+    fig, ax1 = plt.subplots(1, 1, figsize=(10, 8))
+    ax1.semilogx(rp, rval, label=r"Iterative threshold $\mu$ = {0:.4f}".format(mu))
     ax1.semilogx(rp, crp, label=r"Percentile threshold $\mu$ = {0:.4f}".format(thresh),
                  color='0.5')
     ax1.semilogx(rp, lrp, label=r"90% CI", color='0.5', linestyle='--')
@@ -101,43 +105,81 @@ def runFit(recs, locId, locName, numYears, outputPath):
     plt.close()
     return locId, mu, xi, sigma, rate, rval, thresh, rate2, (params), rval2, lrp, urp
 
-def processCI(recs, locId, locName, numYears, outputPath):
+def processCI(recs, locId, locName, numYears, outputPath, pctl=99.):
+    print(f"Plotting ARI curve for {locName} ({locId})")
     wspd = recs['wspd'][recs['wspd'] > 0]
-
-    data = np.zeros(365.25 * numYears)
+    years = np.array([1, 2, 5, 10, 20, 50, 100, 200,
+                      500, 1000, 2000, 5000, 10000])
+    data = np.zeros(int(365.25 * numYears))
     data[-len(wspd):] = wspd
     emprp = empReturnPeriod(data)
 
     xi, sigma, mu = gpdSelectThreshold(wspd, nexc=10)
     rate = float(len(data[data > mu])) / float(len(data))
-
-    threshold = np.percentile(wspd, 99.)
+    if xi == 0:
+        itrval = np.zeros(len(years))
+    else:
+        itrval = returnLevels(years, mu, xi, sigma, rate)
+    
+    threshold = np.percentile(wspd, pctl)
     rate2 = float(len(data[data > threshold])) / float(len(data))
     gpd = genpareto.fit(wspd[wspd > threshold], loc=threshold)
-    years = np.array([1, 2, 5, 10, 20, 50, 100, 200,
-                      500, 1000, 2000, 5000, 10000])
+
 
     params, crp, lrp, urp = calculateUncertainty(wspd[wspd > threshold], years, *gpd)
     if crp is None:
         return None
     fig, ax = plt.subplots(1, 1)
-    ax.semilogx(years, crp, label="Fitted ARI")
+    ax.semilogx(years, crp, label=rf"Fitted ARI ($\mu = P_{{{pctl}}}$)")
     ax.semilogx(years, lrp, '0.5', label=r"90% CI", ls='--')
     ax.semilogx(years, urp, '0.5', ls='--')
-    ax.scatter(emprp[emprp > 1], data[emprp > 1], s=100,
+    ax.axvline(500, color='k', zorder=1)
+    ax.text(500, 0, "1:500", ha='right', va='bottom', rotation='vertical', fontsize='x-small')
+    ax.axvline(2000, color='k', zorder=1)
+    ax.text(2000, 0, "1:2000", ha='right', va='bottom', rotation='vertical', fontsize='x-small')
+    ax.semilogx(years, itrval, label=rf'Iterative ARI ($\mu = {{{mu:.4f}}}$)', color='k')
+    ax.scatter(emprp[emprp > 1], data[emprp > 1], s=50, alpha=0.5,
                      color='r', label = "Empirical ARI")
 
-    ax.set_ylim((0, 100))
-    ax.set_yticks(np.arange(0, 101, 10))
+    ax.set_ylim((0, 120))
+    ax.set_yticks(np.arange(0, 121, 10))
     ax.set_xlim((1, 10000))
-    ax.set_ylabel('Wind speed (m/s)')
-    ax.set_xlabel('Average recurrence interval (years)')
+    ax.xaxis.set_major_formatter(ScalarFormatter())
+    ax.set_ylabel('Wind speed [m/s]')
+    ax.set_xlabel('Average recurrence interval [years]')
     ax.grid(which='major', linestyle='-')
     ax.grid(which='minor', linestyle='--', linewidth=1)
     ax.set_title("{0}".format(locName))
     ax.legend(loc=2)
     fig.tight_layout()
     plt.savefig(pjoin(outputPath, "{0}.png".format(locId)), 
+                bbox_inches="tight")
+    #plt.close()
+    aep = 1. / years
+    fig2, ax2 = plt.subplots(1, 1)
+    ax2.semilogy(crp, aep, label=rf'Fitted AEP ($\mu = P_{{{pctl}}}$)')
+    ax2.semilogy(lrp, aep, '0.5', ls='--', label=r"90% CI")
+    ax2.semilogy(urp, aep, '0.5', ls='--')
+    ax2.semilogy(itrval, aep, color='k', label=rf'Iterative AEP  ($\mu = {{{mu:.4f}}}$)')
+    ax2.scatter(data[emprp > 1], 1./emprp[emprp > 1], s=50, alpha=0.5,
+               color='r', label='Empirical AEP')
+    ax2.yaxis.set_major_locator(majloc)
+    ax2.yaxis.set_minor_locator(minloc)
+    ax2.yaxis.set_minor_formatter(NullFormatter())
+    ax2.legend(loc=1, fontsize='small')
+    
+    ax2.set_ylabel("Annual exceedance probability [%]")
+    ax2.set_xlabel("Wind speed [m/s]")
+    ax2.set_xlim((0, 120))
+    ax2.axhline(1./500, color='k', zorder=1)
+    ax2.text(0, 1./500, "1:500", ha='left', va='bottom', fontsize='x-small')
+    ax2.axhline(1./2000, color='k', zorder=1)
+    ax2.text(0, 1./2000, "1:2000", ha='left', va='bottom', fontsize='x-small')
+    ax2.grid(which='major', linestyle='-')
+    ax2.grid(which='minor', linestyle='--', linewidth=0.5)
+    fig2.tight_layout()
+    
+    plt.savefig(pjoin(outputPath, "{0}.AEP.png".format(locId)), 
                 bbox_inches="tight")
     plt.close()
 
@@ -162,7 +204,9 @@ def main(configFile):
              format(len(locations)))
     locNameList = list(locations['locName'])
     locIdList = list(locations['locId'])
-    pp.barrier()
+    comm.barrier()
+
+    status = MPI.Status()
 
     work_tag = 0
     result_tag = 1
@@ -175,7 +219,7 @@ def main(configFile):
     rvalheader = "locId, locName, " + ", ".join(["{:d}"]*len(rp)).format(*rp) + "\n"
     rvalfmt = "{}, {}, " + ", ".join(["{:.2f}"] * len(rp)) + "\n"
     # On the head node:
-    if (pp.rank() == 0) and (pp.size() > 1):
+    if (comm.rank == 0) and (comm.size > 1):
         fh = open(pjoin(processPath, "parameters.csv"), "w")
         rval1fh = open(pjoin(processPath, "iterative_rl.csv"), "w")
         rval2fh = open(pjoin(processPath, "fitted_rl.csv"), "w")
@@ -188,25 +232,24 @@ def main(configFile):
         rvallfh.write(rvalheader)
 
         w = 0
-        p = pp.size() - 1
+        p = comm.size - 1
 
-        for d in range(1, pp.size()):
+        for d in range(1, comm.size):
             if w < len(locations):
                 locName = locNameList[w]
                 locId = locations['locId'][locNameList.index(locName)]
                 log.info("Running calculations for {0}".format(locName))
                 args = (locId, locName, numYears, plotPath)
-                pp.send(args, destination=d, tag=work_tag)
+                comm.send(args, dest=d, tag=work_tag)
                 w += 1
             else:
-                pp.send(None, destination=d, tag=work_tag)
+                comm.send(None, dest=d, tag=work_tag)
                 p = w
 
         terminated = 0
 
         while terminated < p:
-            result, status = pp.receive(pp.any_source, tag=result_tag,
-                                        return_status=True)
+            result = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
             log.debug("Receiving results from node {0}".\
                       format(status.source))
             if result is None:
@@ -226,29 +269,29 @@ def main(configFile):
                 locId = locations['locId'][locNameList.index(locName)]
                 log.info("Running calculations for {0}".format(locName))
                 args = (locId, locName, numYears, plotPath)
-                pp.send(args, destination=d, tag=work_tag)
+                comm.send(args, dest=d, tag=work_tag)
                 w += 1
             else:
-                pp.send(None, destination=d, tag=work_tag)
+                comm.send(None, dest=d, tag=work_tag)
                 terminated += 1
 
         fh.close()
 
     # On the worker nodes:
-    elif (pp.size() > 1) and (pp.rank() != 0):
+    elif (comm.size > 1) and (comm.rank != 0):
         while True:
-            args = pp.receive(source=0, tag=work_tag)
+            args = comm.recv(source=0, tag=work_tag, status=status)
             if args is None:
                 break
 
             locId, locName, numYears, plotPath = args
             log.info("Processing {0} on node {1}".\
-                     format(args[1], pp.rank()))
+                     format(args[1], comm.rank))
             recs = database.locationRecords(db, locId)
             result = processCI(recs, locId, locName, numYears, plotPath)
-            pp.send(result, destination=0, tag=result_tag)
+            comm.send(result, dest=0, tag=result_tag)
 
-    elif pp.size() == 1 and pp.rank() == 0:
+    elif comm.size == 1 and comm.rank == 0:
         # Assume no Pypar
         db = database.HazardDatabase(configFile)
         locations = db.getLocations()
@@ -328,14 +371,14 @@ def startup():
     if args.debug:
         debug = True
 
-    global pp
-    pp = attemptParallel()
+    global MPI, comm
+    MPI = attemptParallel()
     import atexit
-    atexit.register(pp.finalize)
-
-    if pp.size() > 1 and pp.rank() > 0:
+    atexit.register(MPI.Finalize)
+    comm = MPI.COMM_WORLD
+    if comm.size > 1 and comm.rank > 0:
         # MPI execution:
-        logfile += '-' + str(pp.rank())
+        logfile += '-' + str(comm.rank)
         verbose = False
     else:
         pass
@@ -367,11 +410,11 @@ def startup():
             for line in tblines:
                 log.critical(line.lstrip())
             # Gracefully handle failure on parallel execution:
-            if pp.size() > 1:
-                for d in range(1, pp.size()):
-                    pp.send(None, destination=d, tag=0)
+            if comm.size > 1:
+                for d in range(1, comm.size):
+                    comm.send(None, dest=d, tag=0)
 
-    pp.barrier()
+    comm.barrier()
     log.info("Finished running {0}".format(sys.argv[0]))
 
 if __name__ == "__main__":

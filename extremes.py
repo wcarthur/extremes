@@ -12,7 +12,7 @@
 from __future__ import division, print_function
 from itertools import product
 import logging
-from functools import wraps
+from functools import wraps, reduce
 import time
 
 import numpy as np
@@ -44,7 +44,7 @@ def timer(f):
           reduce(lambda ll, b : divmod(ll[0], b) + ll[1:],
                         [(tottime,), 60, 60])
 
-        LOG.info("Time for {0}: {1}".format(f.func_name, msg) )
+        LOG.info("Time for {0}: {1}".format(f.__name__, msg) )
         return res
 
     return wrap
@@ -367,7 +367,7 @@ def calculateUncertainty(wspd, intervals, xi, mu, sig):
                              maxfev=10000 )
     except RuntimeError as e:
         LOG.warn(e)
-        return None, None, None
+        return None, None, None, None
 
     gpd = genpareto.fit(wspd, floc=mu)
     npyr = 365.25
@@ -377,13 +377,22 @@ def calculateUncertainty(wspd, intervals, xi, mu, sig):
                ('mu', gpd[1]),
                ('sig', gpd[2]))
 
+    
     mini = lmfit.Minimizer(residual, p, fcn_args=(centres, n),
                            nan_policy='omit')
 
     # first solve with Nelder-Mead
-    out1 = mini.minimize(method='Nelder')
-    out2 = mini.minimize(method='leastsq', params=out1.params)
-
+    try:
+        out1 = mini.minimize(method='Nelder')
+    except ValueError:
+        LOG.exception("Failed on first attempt to minimize")
+        return None, None, None, None
+    try:
+        out2 = mini.minimize(method='leastsq', params=out1.params)
+    except ValueError as err:
+        LOG.exception(err)
+        return None, None, None, None
+    
     if hasattr(out2, 'covar'):
 
         cmu = out2.params['mu'].value
@@ -396,4 +405,4 @@ def calculateUncertainty(wspd, intervals, xi, mu, sig):
 
     else:
         LOG.warn("No covariance matrix from the minimizer")
-        return None, None, None
+        return None, None, None, None
