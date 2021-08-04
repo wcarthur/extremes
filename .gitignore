@@ -36,3 +36,4 @@ MSLP/*.nc
 .Rhistory
 *.Rhistory
 *.RData
+.Rproj.user
