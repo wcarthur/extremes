@@ -3,10 +3,13 @@ from os.path import join as pjoin, realpath, isdir, dirname
 import sys
 import logging as log
 import traceback
+import atexit
+import warnings
 
 import argparse
-import database
 import numpy as np
+import seaborn as sns
+from scipy.stats import genpareto
 
 import matplotlib
 matplotlib.use('Agg', warn=False)  # Use matplotlib backend
@@ -14,17 +17,14 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import ScalarFormatter, LogLocator, NullFormatter
 plt.ioff()
 
-from scipy.stats import genpareto
-
 from extremes import gpdSelectThreshold, returnLevels, empReturnPeriod, calculateUncertainty
 
+import database
 from Utilities.files import flStartLog, flConfigFile
 from Utilities.config import ConfigParser
 from Utilities.parallel import attemptParallel
 from Utilities.version import version
 
-
-import seaborn as sns
 #sns.set_context("poster")
 sns.set_style("whitegrid")
 
@@ -100,7 +100,7 @@ def runFit(recs, locId, locName, numYears, outputPath):
     ax1.text(15000, 77.8, 'Cat 5', ha='center')
     ax1.legend(loc=2)
     fig.tight_layout()
-    plt.savefig(pjoin(outputPath, "{0}.png".format(locId)), 
+    plt.savefig(pjoin(outputPath, "{0}.png".format(locId)),
                 bbox_inches="tight")
     plt.close()
     return locId, mu, xi, sigma, rate, rval, thresh, rate2, (params), rval2, lrp, urp
@@ -120,7 +120,7 @@ def processCI(recs, locId, locName, numYears, outputPath, pctl=99.):
         itrval = np.zeros(len(years))
     else:
         itrval = returnLevels(years, mu, xi, sigma, rate)
-    
+
     threshold = np.percentile(wspd, pctl)
     rate2 = float(len(data[data > threshold])) / float(len(data))
     gpd = genpareto.fit(wspd[wspd > threshold], loc=threshold)
@@ -139,7 +139,7 @@ def processCI(recs, locId, locName, numYears, outputPath, pctl=99.):
     ax.text(2000, 0, "1:2000", ha='right', va='bottom', rotation='vertical', fontsize='x-small')
     ax.semilogx(years, itrval, label=rf'Iterative ARI ($\mu = {{{mu:.4f}}}$)', color='k')
     ax.scatter(emprp[emprp > 1], data[emprp > 1], s=50, alpha=0.5,
-                     color='r', label = "Empirical ARI")
+               color='r', label="Empirical ARI")
 
     ax.set_ylim((0, 120))
     ax.set_yticks(np.arange(0, 121, 10))
@@ -152,7 +152,7 @@ def processCI(recs, locId, locName, numYears, outputPath, pctl=99.):
     ax.set_title("{0}".format(locName))
     ax.legend(loc=2)
     fig.tight_layout()
-    plt.savefig(pjoin(outputPath, "{0}.png".format(locId)), 
+    plt.savefig(pjoin(outputPath, "{0}.png".format(locId)),
                 bbox_inches="tight")
     #plt.close()
     aep = 1. / years
@@ -162,12 +162,12 @@ def processCI(recs, locId, locName, numYears, outputPath, pctl=99.):
     ax2.semilogy(urp, aep, '0.5', ls='--')
     ax2.semilogy(itrval, aep, color='k', label=rf'Iterative AEP  ($\mu = {{{mu:.4f}}}$)')
     ax2.scatter(data[emprp > 1], 1./emprp[emprp > 1], s=50, alpha=0.5,
-               color='r', label='Empirical AEP')
+                color='r', label='Empirical AEP')
     ax2.yaxis.set_major_locator(majloc)
     ax2.yaxis.set_minor_locator(minloc)
     ax2.yaxis.set_minor_formatter(NullFormatter())
     ax2.legend(loc=1, fontsize='small')
-    
+
     ax2.set_ylabel("Annual exceedance probability [%]")
     ax2.set_xlabel("Wind speed [m/s]")
     ax2.set_xlim((0, 120))
@@ -178,13 +178,12 @@ def processCI(recs, locId, locName, numYears, outputPath, pctl=99.):
     ax2.grid(which='major', linestyle='-')
     ax2.grid(which='minor', linestyle='--', linewidth=0.5)
     fig2.tight_layout()
-    
-    plt.savefig(pjoin(outputPath, "{0}.AEP.png".format(locId)), 
+
+    plt.savefig(pjoin(outputPath, "{0}.AEP.png".format(locId)),
                 bbox_inches="tight")
     plt.close()
 
     return locId, mu, xi, sigma, rate, crp, threshold, rate2, (params), crp, lrp, urp
-
 
 def main(configFile):
     """
@@ -319,7 +318,7 @@ def main(configFile):
             if result is None:
                 continue
             else:
-                locId, mu, sigma, xi, rate1, rval1, thresh, rate2, gpd, rval2, lrp, urp = result        
+                locId, mu, sigma, xi, rate1, rval1, thresh, rate2, gpd, rval2, lrp, urp = result
                 fh.write(paramfmt.format(locId, locName, sigma, mu, xi, rate1, rate2, *gpd))
                 rval1fh.write(rvalfmt.format(locId, locName, *rval1))
                 rval2fh.write(rvalfmt.format(locId, locName, *rval2))
@@ -373,7 +372,6 @@ def startup():
 
     global MPI, comm
     MPI = attemptParallel()
-    import atexit
     atexit.register(MPI.Finalize)
     comm = MPI.COMM_WORLD
     if comm.size > 1 and comm.rank > 0:
@@ -385,7 +383,6 @@ def startup():
 
     log = flStartLog(logfile, logLevel, verbose, datestamp)
     log.info("Code version: {0}".format(version()))
-    import warnings
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     warnings.filterwarnings("ignore", category=UserWarning, module="pytz")
     warnings.filterwarnings("ignore", category=UserWarning, module="numpy")
