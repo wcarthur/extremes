@@ -29,12 +29,14 @@ htmlcov/
 *.py~
 MSLP/*.nc
 *~
+*.code-workspace
 
 # R files
 .RData
 .Rhistory
 *.Rhistory
 *.RData
+.Rproj.user/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
