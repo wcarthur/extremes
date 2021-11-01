@@ -358,7 +358,7 @@ def calculateUncertainty(wspd, intervals, xi, mu, sig):
     :param float xi: initial guess for 
     """
     bins = np.arange(0.5, 100, 1)
-    n, bins = np.histogram(wspd, bins, normed=True)
+    n, bins = np.histogram(wspd, bins, density=True)
     centres = 0.5*(bins[1:]+bins[:-1])
     try:
         pars,cov = curve_fit(lambda x, xi, mu, sig: genpareto.pdf(x, xi, loc=mu, 
