@@ -20,6 +20,7 @@ plt.ioff()
 from extremes import gpdSelectThreshold, returnLevels, empReturnPeriod, calculateUncertainty
 
 import database
+from database.queries import locationRecords
 from Utilities.files import flStartLog, flConfigFile
 from Utilities.config import ConfigParser
 from Utilities.parallel import attemptParallel
@@ -286,7 +287,7 @@ def main(configFile):
             locId, locName, numYears, plotPath = args
             log.info("Processing {0} on node {1}".\
                      format(args[1], comm.rank))
-            recs = database.locationRecords(db, locId)
+            recs = locationRecords(db, locId)
             result = processCI(recs, locId, locName, numYears, plotPath)
             comm.send(result, dest=0, tag=result_tag)
 
@@ -312,7 +313,7 @@ def main(configFile):
         for locName in locNameList:
             log.info("Running calculations for {0}".format(locName))
             locId = locations['locId'][locNameList.index(locName)]
-            recs = database.locationRecords(db, locId)
+            recs = locationRecords(db, locId)
             args = (recs, locId, locName, numYears, plotPath)
             result = processCI(recs, locId, locName, numYears, plotPath)
             if result is None:
