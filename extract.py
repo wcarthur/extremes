@@ -79,12 +79,14 @@ def main():
     p.add_argument('-p', '--path', help="Base path to data")
     p.add_argument('-o', '--output', help="Output path")
     p.add_argument('-v', '--variable', help="Variable name", default="i10fg")
+    p.add_argument('-s', '--stations', help="Station listing")
     args = p.parse_args()
 
     year = int(args.year)
     datapath = args.path
     variable = args.variable
     outputpath = args.output
+    stationfile = args.stations
 
     logFile = f"extract.{variable}.{year}.log"
     logLevel = "INFO"
@@ -97,8 +99,15 @@ def main():
                                   datefmt='%H:%M:%S', )
     console.setFormatter(formatter)
     LOGGER.addHandler(console)
-    
-    stnlist = gpd.read_file("/home/547/cxa547/extremes/stationlist.shp")
+
+    if not os.path.isdir(outputpath):
+        try:
+            os.makedirs(outputpath)
+        except OSError:
+            LOGGER.exception(f"Cannot create output directory {outputpath}")
+            raise
+
+    stnlist = gpd.read_file(stationfile)
     stnid = stnlist.stnNum.values
     stnx = stnlist.stnLon.values
     stny = stnlist.stnLat.values
@@ -121,10 +130,10 @@ def main():
     ds.attrs['title'] = "ERA5 single-level reanalysis instantaneous_10m_wind_gust"
     ds.attrs['license'] = "Licence to use Copernicus Products: https://apps.ecmwf.int/datasets/licences/copernicus/"
     ds.attrs['source'] = "Fifth generation ECMWF atmospheric reanalysis of the global climate"
-    ds.attrs['local_source']
+    ds.attrs['local_source'] = datapath
     ds.attrs['code_version'] = COMMIT
     ds.attrs['created_by'] = getpass.getuser()
-    ds.attrs['history'] = f"{starttime}: {' '.join(sys.argv)}"
+    ds.attrs['history'] = f"{startime}: {' '.join(sys.argv)}"
     ds.to_netcdf(os.path.join(outputpath, f"ts.{variable}.{year}.nc"))
 
 if __name__ == "__main__":
