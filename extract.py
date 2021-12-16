@@ -68,6 +68,9 @@ def to_dataset(filename, lons, lats, timeperiod='1D', func=np.max):
         .reduce(func)
     )
 
+    for varname, da in ds.data_vars.items():
+        ts[varname].attrs.update(da.attrs)
+
     return ts
 
 
