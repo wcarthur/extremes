@@ -9,6 +9,7 @@ import warnings
 import argparse
 import numpy as np
 import seaborn as sns
+import pandas as pd
 from scipy.stats import genpareto
 
 import matplotlib
@@ -105,6 +106,19 @@ def runFit(recs, locId, locName, numYears, outputPath):
                 bbox_inches="tight")
     plt.close()
     return locId, mu, xi, sigma, rate, rval, thresh, rate2, (params), rval2, lrp, urp
+
+
+def saveRecords(recs, locId, outputPath, numYears=10000):
+    wspd = recs['wspd'][recs['wspd'] > 0] 
+    data = np.zeros(int(365.25 * numYears))
+    data[-len(wspd):] = wspd
+    emprp = empReturnPeriod(data)
+    df = pd.DataFrame.from_records(recs)
+    df = df[df.wspd>0.0]
+    df['ARI'] = emprp[-len(wspd):]
+    filename = pjoin(outputPath, f"{locId}.csv")
+    df.to_csv(filename, index=False, float_format="%.2f")
+
 
 def processCI(recs, locId, locName, numYears, outputPath, pctl=99.):
     print(f"Plotting ARI curve for {locName} ({locId})")
@@ -288,6 +302,7 @@ def main(configFile):
             log.info("Processing {0} on node {1}".\
                      format(args[1], comm.rank))
             recs = locationRecords(db, locId)
+            saveRecords(recs, locId, plotPath)
             result = processCI(recs, locId, locName, numYears, plotPath)
             comm.send(result, dest=0, tag=result_tag)
 
@@ -314,6 +329,7 @@ def main(configFile):
             log.info("Running calculations for {0}".format(locName))
             locId = locations['locId'][locNameList.index(locName)]
             recs = locationRecords(db, locId)
+            saveRecords(recs, locId, plotPath)
             args = (recs, locId, locName, numYears, plotPath)
             result = processCI(recs, locId, locName, numYears, plotPath)
             if result is None:
