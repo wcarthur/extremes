@@ -17,7 +17,7 @@ def hft(t, x, shp, loc, scale, M=2, d=100):
     Nonstationary hazard function
     """
     k = scale * np.exp(np.log(M) * t / d)
-    hf = genpareto.pdf(x, shp, loc=loc, scale=k)
+    hf = 1 - genpareto.cdf(x, shp, loc=loc, scale=k)
     return hf
 
 def chf(tmin, tmax, x, shp, loc, scale, M=2, d=100):
@@ -56,17 +56,14 @@ def sf(tmin, tmax, x, shp, loc, scale, M=2, d=100):
     res = np.exp(-val[0])
     return res
 
-
-
-# Wind speed
-x = 12
+def quantile(p, shp, scale):
+    return (scale/shp) * (1 - np.power(p, shp))
 
 
 scale = 10
 beta = 0.001
 loc = 0
 shp = 0.0388888
-shp = 0.178
 
 #x = genpareto.ppf(0.999, shp, loc=loc, scale=scale)
 
@@ -77,10 +74,24 @@ shp = 0.178
 tmin=0
 tmax=1000
 
-x = 80
+x = 50
 p0 = hft(0, x, shp, loc, scale)
+p0 = 0.002
+x = quantile(p0, shp, scale)
 Cx = 1 / np.sqrt(2 * shp + 1)
-print(f"p0={p0:.6f}; Cx = {Cx:.4f}")
+print(f"p0={p0:.6f}; Cx = {Cx:.4f}; x = {x:.2f}")
+
+
+
+
+ep = [quantile(p, shp, scale) for p in np.logspace(-4, -1, endpoint=True, num=31)]
+fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+ax.semilogy(ep, np.logspace(-4, -1, num=31, endpoint=True))
+ax.set_ylabel("Exceedance probability")
+ax.set_xlabel("Magnitude")
+ax.vlines(x=x, ymin=0, ymax=p0, ls='--')
+ax.grid(which='both')
+plt.show()
 
 # Hazard function for a fixed time:
 
