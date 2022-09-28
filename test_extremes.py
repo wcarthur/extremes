@@ -1,7 +1,29 @@
 import unittest
 import numpy as np
+from NumpyTestCase import NumpyTestCase
 
-from extremes import gpdSelectThreshold, gpdAsymptote
+from extremes import gpdSelectThreshold, gpdAsymptote, ppoints
+
+class TestPoints(NumpyTestCase):
+    """
+    Test ppoints function
+    """
+    def setUp(self):
+        self.input = np.array(np.arange(1, 21))
+        self.results = np.array([0.06097561, 0.15853659, 0.25609756,
+                                 0.35365854, 0.45121951, 0.54878049,
+                                 0.64634146, 0.74390244, 0.84146341,
+                                 0.93902439])
+        self.results1 = np.array([0.1, 0.26, 0.42, 0.58, 0.74, 0.9])
+        self.results2 = np.array([0.025, 0.075, 0.125, 0.175, 0.225,
+                                  0.275, 0.325, 0.375, 0.425,  0.475,
+                                  0.525, 0.575, 0.625, 0.675, 0.725,
+                                  0.775, 0.825, 0.875, 0.925, 0.975])
+
+    def test_ppoints(self):
+        self.numpyAssertAlmostEqual(ppoints(10), self.results)
+        self.numpyAssertAlmostEqual(ppoints(6), self.results1)
+        self.numpyAssertAlmostEqual(ppoints(self.input), self.results2)
 
 class TestSelection(unittest.TestCase):
     """
@@ -15,7 +37,7 @@ class TestSelection(unittest.TestCase):
         """Test all zero input gives zeros as result"""
         data = np.zeros(50)
         result = gpdSelectThreshold(data)
-        
+
         self.assertEqual(type(result), type(self.emptyResult))
         self.assertEqual(len(result), len(self.emptyResult))
         self.assertTrue(np.alltrue(np.equal(result, self.emptyResult)))

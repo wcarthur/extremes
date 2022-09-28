@@ -49,6 +49,24 @@ def timer(f):
 
     return wrap
 
+def ppoints(n, a=0.375):
+    """
+    Generates the sequence of probabilities at which to evaluate an inverse distribution.
+
+    :param n: either int or `np.array` - either number of points, or an array of observations.
+    :param float a: offset fraction, typically in (0, 1), default=0.375
+    """
+    if isinstance(n, int):
+        m = np.arange(1, n + 1)
+        if n > 10:
+            a = 0.5
+    else:
+        m = np.arange(1, len(n) + 1)
+        if len(n) > 10:
+            a = 0.5
+    pp = (m - a)/(m[-1] + (1 - a) - a)
+    return pp
+
 def returnLevels(intervals, mu, xi, sigma, rate, npyr=OBS_PER_YEAR):
     """
     Calculate return levels for specified intervals for a generalised pareto
@@ -248,7 +266,7 @@ def gpdSelectThreshold(data, nexc=10):
     datamax = data.max()
     nobs = len(data)
     if len(data.compress(data > 0)) == 0:
-        LOG.warn("All data for threshold selection are zero - exiting")
+        LOG.warning("All data for threshold selection are zero - exiting")
         return 0, 0, 0
     startmu = data.compress(data > 0).max()/2
     for mu in np.arange(startmu, datamax, 0.05):
@@ -284,7 +302,7 @@ def gpdSelectThreshold(data, nexc=10):
 
     # If there are no valid threshold values, then return zeros:
     if len(t) == 0:
-        LOG.warn("No suitable shape parameters identified")
+        LOG.warning("No suitable shape parameters identified")
         return 0, 0, 0
 
     # Take the average value of the 1000- and 10000-year return period
@@ -355,18 +373,18 @@ def calcSD(pars, cov, rate, npyr, intervals):
 def calculateUncertainty(wspd, intervals, xi, mu, sig):
     """
     :param wspd: :class:`numpy.array` of wind speeds
-    :param float xi: initial guess for 
+    :param float xi: initial guess for
     """
     bins = np.arange(0.5, 100, 1)
     n, bins = np.histogram(wspd, bins, density=True)
     centres = 0.5*(bins[1:]+bins[:-1])
     try:
-        pars,cov = curve_fit(lambda x, xi, mu, sig: genpareto.pdf(x, xi, loc=mu, 
-                                                                  scale=sig), 
-                             centres, n, p0=[0, np.mean(wspd), np.mean(wspd)], 
+        pars,cov = curve_fit(lambda x, xi, mu, sig: genpareto.pdf(x, xi, loc=mu,
+                                                                  scale=sig),
+                             centres, n, p0=[0, np.mean(wspd), np.mean(wspd)],
                              maxfev=10000 )
     except RuntimeError as e:
-        LOG.warn(e)
+        LOG.warning(e)
         return None, None, None, None
 
     gpd = genpareto.fit(wspd, floc=mu)
@@ -377,7 +395,7 @@ def calculateUncertainty(wspd, intervals, xi, mu, sig):
                ('mu', gpd[1]),
                ('sig', gpd[2]))
 
-    
+
     mini = lmfit.Minimizer(residual, p, fcn_args=(centres, n),
                            nan_policy='omit')
 
@@ -392,7 +410,7 @@ def calculateUncertainty(wspd, intervals, xi, mu, sig):
     except ValueError as err:
         LOG.exception(err)
         return None, None, None, None
-    
+
     if hasattr(out2, 'covar'):
 
         cmu = out2.params['mu'].value
@@ -404,5 +422,5 @@ def calculateUncertainty(wspd, intervals, xi, mu, sig):
         return (cxi, cmu, csig), crp, lrp, urp
 
     else:
-        LOG.warn("No covariance matrix from the minimizer")
+        LOG.warning("No covariance matrix from the minimizer")
         return None, None, None, None
