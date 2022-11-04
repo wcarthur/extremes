@@ -36,6 +36,35 @@ minloc = LogLocator(base=10.0, subs=np.arange(0.1, 1, 0.1), numticks=12)
 mpl_logger = log.getLogger('matplotlib')
 mpl_logger.setLevel(log.WARNING)
 
+# plot AEP windspeeds for each station where available:
+OBSDIR = '/g/data/w85/data/obs/tcobs'
+"""
+OBSDICT = {"Brisbane Airport M. O": "040223",
+           "Amberley Aerodrome": "040004",
+           "Rockhampton Airport": "039083",
+           "Hamilton Island": "033106",
+           "Gladstone Airport Aws": "039123",
+           "Willis Island": "200283",
+           "Townsville Amo": "032040",
+           "Cairns Airport": "031011",
+           "Lucinda Point Aws": "032141",
+           "Mackay Mo": "033119",
+           }
+
+"""
+OBSDICT = {"BRISBANE AERO": "040223",
+           "AMBERLEY AMO": "040004",
+           "BRISBANE REGIONAL OFFICE": "040214",
+           "GLADSTONE RADAR": "039123",
+           "ROCKHAMPTON AERO": "039083",
+           "WILLIS ISLAND": "200283",
+           "TOWNSVILLE AERO": "032040",
+           "MACKAY M.O": "033119",
+           "HAMILTON ISLAND AIRPORT": "033106",
+           "LUCINDA POINT": "032141",
+           "CAIRNS AERO": "031011"}
+
+
 def runFit(recs, locId, locName, numYears, outputPath):
     """
     Run a GPD fitting routine, using both the threshold selection algorithm
@@ -53,8 +82,8 @@ def runFit(recs, locId, locName, numYears, outputPath):
 
     data = np.zeros(int(numYears * 365.25))
     data[-len(recs):] = recs['wspd']
-    rp = np.array([1, 2, 5, 10, 20, 50, 100, 200,
-                   500, 1000, 2000, 5000, 10000])
+    rp = np.array([1, 2, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250, 300, 400,
+                   500, 750, 1000, 1500, 2000, 2500, 3000, 4000, 5000, 7500, 10000])
 
     # Rate of exceedances above the algorithmically-selected threshold:
     rate = float(len(data[data > mu])) / float(len(data))
@@ -109,22 +138,36 @@ def runFit(recs, locId, locName, numYears, outputPath):
 
 
 def saveRecords(recs, locId, outputPath, numYears=10000):
-    wspd = recs['wspd'][recs['wspd'] > 0] 
+    wspd = recs['wspd'][recs['wspd'] > 0]
     data = np.zeros(int(365.25 * numYears))
     data[-len(wspd):] = wspd
     emprp = empReturnPeriod(data)
     df = pd.DataFrame.from_records(recs)
     df = df[df.wspd>0.0]
     df['ARI'] = emprp[-len(wspd):]
+    df['AEP'] = 1 - np.exp(-1 / df['ARI'])
     filename = pjoin(outputPath, f"{locId}.csv")
-    df.to_csv(filename, index=False, float_format="%.2f")
+    df.to_csv(filename, index=False,)
 
 
 def processCI(recs, locId, locName, numYears, outputPath, pctl=99.):
+    """
+    Plot ARI/AEP curves for a location, with MLE fitted GPD, iterative threshold
+    selection of GPD and plotting position method.
+
+    :param recs: `np.recarray` of wind speeds for the station
+    :param str locId: location code from the TCRM locations database
+    :param str locName: location name
+    :param int numYears: Number of simulated years from the TCRM simulation
+    :param str outputPath: path where plots will be saved
+    :param float pctl: Percentile for the threshold to be used in the MLE
+        fitting routine (default=99.0)
+    """
+
     print(f"Plotting ARI curve for {locName} ({locId})")
     wspd = recs['wspd'][recs['wspd'] > 0]
-    years = np.array([1, 2, 5, 10, 20, 50, 100, 200,
-                      500, 1000, 2000, 5000, 10000])
+    years = np.array([1, 2, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250, 300, 400,
+                   500, 750, 1000, 1500, 2000, 2500, 3000, 4000, 5000, 7500, 10000])
     data = np.zeros(int(365.25 * numYears))
     data[-len(wspd):] = wspd
     emprp = empReturnPeriod(data)
@@ -140,6 +183,10 @@ def processCI(recs, locId, locName, numYears, outputPath, pctl=99.):
     rate2 = float(len(data[data > threshold])) / float(len(data))
     gpd = genpareto.fit(wspd[wspd > threshold], loc=threshold)
 
+    # Optionally add in observed data where it exists. These need to be
+    # calculated separately.
+    if locName.lstrip() in OBSDICT:
+        obsppaep = pd.read_csv(os.path.join(OBSDIR, f"ppari_{OBSDICT[locName.lstrip()]}.csv"))
 
     params, crp, lrp, urp = calculateUncertainty(wspd[wspd > threshold], years, *gpd)
     if crp is None:
@@ -155,12 +202,14 @@ def processCI(recs, locId, locName, numYears, outputPath, pctl=99.):
     ax.semilogx(years, itrval, label=rf'Iterative ARI ($\mu = {{{mu:.4f}}}$)', color='k')
     ax.scatter(emprp[emprp > 1], data[emprp > 1], s=50, alpha=0.5,
                color='r', label="Empirical ARI")
-
-    ax.set_ylim((0, 120))
+    if locName.lstrip() in OBSDICT:
+        ax.scatter(obsppaep['pprp'], obsppaep['gust_std'], marker="*", s=30, c='k',
+                   zorder=100, label='Observed')
+    ax.set_ylim((0, 100))
     ax.set_yticks(np.arange(0, 121, 10))
     ax.set_xlim((1, 10000))
     ax.xaxis.set_major_formatter(ScalarFormatter())
-    ax.set_ylabel('Wind speed [m/s]')
+    ax.set_ylabel('0.2 sec gust wind speed [m/s]')
     ax.set_xlabel('Average recurrence interval [years]')
     ax.grid(which='major', linestyle='-')
     ax.grid(which='minor', linestyle='--', linewidth=1)
@@ -170,26 +219,34 @@ def processCI(recs, locId, locName, numYears, outputPath, pctl=99.):
     plt.savefig(pjoin(outputPath, "{0}.png".format(locId)),
                 bbox_inches="tight")
     #plt.close()
-    aep = 1. / years
+
+    # Plot the AEP curve
+    aep = 1 - np.exp(- 1. / years)
+    empaep = 1 - np.exp(-1 / emprp[emprp > 1])
     fig2, ax2 = plt.subplots(1, 1)
-    ax2.semilogy(crp, aep, label=rf'Fitted AEP ($\mu = P_{{{pctl}}}$)')
-    ax2.semilogy(lrp, aep, '0.5', ls='--', label=r"90% CI")
-    ax2.semilogy(urp, aep, '0.5', ls='--')
-    ax2.semilogy(itrval, aep, color='k', label=rf'Iterative AEP  ($\mu = {{{mu:.4f}}}$)')
-    ax2.scatter(data[emprp > 1], 1./emprp[emprp > 1], s=50, alpha=0.5,
+    ax2.semilogy(crp*3.6, aep, label=rf'Fitted AEP ($\mu = P_{{{pctl}}}$)')
+    ax2.semilogy(lrp*3.6, aep, '0.5', ls='--', label=r"90% CI")
+    ax2.semilogy(urp*3.6, aep, '0.5', ls='--')
+    ax2.semilogy(itrval*3.6, aep, color='k', label=rf'Iterative AEP ($\mu = {{{mu:.4f}}}$)')
+    ax2.scatter(data[emprp > 1]*3.6, empaep, s=50, alpha=0.5,
                 color='r', label='Empirical AEP')
+    if locName.lstrip() in OBSDICT:
+        ax2.scatter(obsppaep['gust_std']*3.6, obsppaep['ppaep'],
+                    marker="x", s=30, c='k', zorder=100,
+                    label='Observed')
     ax2.yaxis.set_major_locator(majloc)
     ax2.yaxis.set_minor_locator(minloc)
     ax2.yaxis.set_minor_formatter(NullFormatter())
     ax2.legend(loc=1, fontsize='small')
 
-    ax2.set_ylabel("Annual exceedance probability [%]")
-    ax2.set_xlabel("Wind speed [m/s]")
-    ax2.set_xlim((0, 120))
+    ax2.set_ylabel("Annual exceedance probability")
+    ax2.set_xlabel("0.2-sec gust wind speed [km/h]")
+    ax2.set_xlim((50, 360))
+    ax2.set_ylim((10e-5, 1))
     ax2.axhline(1./500, color='k', zorder=1)
-    ax2.text(0, 1./500, "1:500", ha='left', va='bottom', fontsize='x-small')
+    ax2.text(50, 1./500, "1:500", ha='left', va='bottom', fontsize='x-small')
     ax2.axhline(1./2000, color='k', zorder=1)
-    ax2.text(0, 1./2000, "1:2000", ha='left', va='bottom', fontsize='x-small')
+    ax2.text(50, 1./2000, "1:2000", ha='left', va='bottom', fontsize='x-small')
     ax2.grid(which='major', linestyle='-')
     ax2.grid(which='minor', linestyle='--', linewidth=0.5)
     fig2.tight_layout()
@@ -225,8 +282,8 @@ def main(configFile):
     work_tag = 0
     result_tag = 1
 
-    rp = np.array([1, 2, 5, 10, 20, 50, 100, 200,
-                   500, 1000, 2000, 5000, 10000])
+    rp = np.array([1, 2, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250, 300, 400,
+                   500, 750, 1000, 1500, 2000, 2500, 3000, 4000, 5000, 7500, 10000])
     paramheader = ("locId, locName, it_shape, it_thresh, it_scale, it_rate,"
                    " gpd_rate, gpd_shape, gpd_thresh, gpd_scale\n")
     paramfmt = "{}, {}, " + ", ".join(["{:.8f}"] * 8) + "\n"
