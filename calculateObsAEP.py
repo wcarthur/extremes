@@ -24,9 +24,11 @@ stnfile = pjoin(stationFilePath, "DC02D_StnDet_999999999632559_M3.csv")
 STNTYPES = [('st', 'S2'), ('stnId', 'i'), ('stnDistCode', 'S4'), ('stnName', 'S'),
             ('stnDateOpen', 'S10'), ('stnDateClosed', 'S10'), ('stnLat', 'f8'),
             ('stnLon', 'f8'), ('method', 'S15'), ('state', 'S3'),
-            ('stnElevation', 'f8'), ('baroElev', 'i'), ('stnWMONumber', 'i'), ('stnDataStart', 'i'),
+            ('stnElevation', 'f8'), ('baroElev',
+                                     'i'), ('stnWMONumber', 'i'), ('stnDataStart', 'i'),
             ('stnDataEnd', 'i'), ('percentcomplete', 'f8'), ('pcqualy', 'f8'),
-            ('pcqualn', 'f8'), ('pcqualw', 'f8'), ('pcquals', 'f8'), ('pcquali', 'f8'), ('end', 'S1'),
+            ('pcqualn', 'f8'), ('pcqualw', 'f8'), ('pcquals',
+                                                   'f8'), ('pcquali', 'f8'), ('end', 'S1'),
             ('rindex', 'i',), ('stName', 'S'), ('tname', 'S'),
             ('Mt_n', 'f8'), ('Mz_n', 'f8'), ('M3_n', 'f8'),
             ('Mt_ne', 'f8'), ('Mz_ne', 'f8'), ('M3_ne', 'f8'),
@@ -35,13 +37,14 @@ STNTYPES = [('st', 'S2'), ('stnId', 'i'), ('stnDistCode', 'S4'), ('stnName', 'S'
             ('Mt_s', 'f8'), ('Mz_s', 'f8'), ('M3_s', 'f8'),
             ('Mt_sw', 'f8'), ('Mz_sw', 'f8'), ('M3_sw', 'f8'),
             ('Mt_w', 'f8'), ('Mz_w', 'f8'), ('M3_w', 'f8'),
-            ('Mt_nw', 'f8'), ('Mz_nw', 'f8'), ('M3_nw', 'f8'),]
-STNCONVERT = {'stnName' : str.rstrip}
+            ('Mt_nw', 'f8'), ('Mz_nw', 'f8'), ('M3_nw', 'f8'), ]
+STNCONVERT = {'stnName': str.rstrip}
 
 
 def loadTCObs(obsfile: str) -> pd.DataFrame:
     """
-    Load a file containing observed TC wind gusts. Ensure the date/time columns are `pd.Datetime` types.
+    Load a file containing observed TC wind gusts. Ensure the date/time
+    columns are `pd.Datetime` types.
 
     :param str obsfile: Path to the file containing observations
 
@@ -52,17 +55,20 @@ def loadTCObs(obsfile: str) -> pd.DataFrame:
     df['dtTC'] = pd.to_datetime(df['dtTC'])
     return df
 
+
 def loadObservations(stnId):
     """
-    Load the observations from file for a given BoM station, where the observations have
-    been selected from the complete digital history of daily maximum wind speeds, where a cyclone has
-    passed within 200 km of the station, and the station was open at the time of passage.
+    Load the observations from file for a given BoM station, where the
+    observations have been selected from the complete digital history of
+    daily maximum wind speeds, where a cyclone has passed within 200 km of
+    the station, and the station was open at the time of passage.
 
     :param int stnId: Bureau of Meteorology Station identification number
 
-    :returns: data frame containing the gust wind speed, direction and cyclone name
-              based on passage of cyclones near the selected station. If no observation
-              file is found (`Exception.FileNotFoundError`), return `None`
+    :returns: data frame containing the gust wind speed, direction and
+              cyclone name based on passage of cyclones near the selected
+              station. If no observation file is found
+              (`Exception.FileNotFoundError`), return `None`
     """
 
     names = ['recid', 'stnId', 'datetime', 'gust',
@@ -77,10 +83,11 @@ def loadObservations(stnId):
         return None
     return obsdf
 
+
 def getStationDates(stndf, stnId):
     """
-    Retrieve the length of observed record in years, based on the start and end dates
-    of the observational data.
+    Retrieve the length of observed record in years, based on the start
+    and end dates of the observational data.
 
     :param int stnId: Bureau of Meteorology Station identification number
 
@@ -90,6 +97,7 @@ def getStationDates(stndf, stnId):
     endYear = stndf.loc[stnId]['stnDataEnd']
     numYears = endYear - startYear + 1
     return numYears
+
 
 def getStationM3(stndf, stnId):
     """
@@ -114,6 +122,7 @@ def getStationM3(stndf, stnId):
         return mt, mz
     return mt, mz
 
+
 def categoriseDirection(df: pd.DataFrame) -> pd.DataFrame:
     """
     Categorise the direction to enable selection of appropriate directional site multiplier
@@ -125,8 +134,10 @@ def categoriseDirection(df: pd.DataFrame) -> pd.DataFrame:
     labels = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw', 'n']
     bins = [0, 22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5, 360]
 
-    df['dir'] = pd.cut(df.direction, bins=bins, right=True, ordered=False, labels=labels)
+    df['dir'] = pd.cut(df.direction, bins=bins, right=True,
+                       ordered=False, labels=labels)
     return df
+
 
 def calcObservedEP(stnNum: int, df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -154,6 +165,7 @@ def calcObservedEP(stnNum: int, df: pd.DataFrame) -> pd.DataFrame:
     df['ppaep'] = 1. - np.exp(-1./df['pprp'])
     return df
 
+
 def plotObsEP(stnNum: int, obsdf: pd.DataFrame):
     """
     Plot an EP curve for the set of observarions
@@ -179,14 +191,18 @@ def plotObsEP(stnNum: int, obsdf: pd.DataFrame):
     ax.set_ylim((10e-3, 1))
     ax.set_xlabel('Wind speed [m/s]')
     ax.set_ylabel('Annual Exceedance Probability')
-    #ax.yaxis.set_minor_formatter(NullFormatter())
+    # ax.yaxis.set_minor_formatter(NullFormatter())
     fig.tight_layout()
     plt.savefig(pjoin(obsPath, f"ppari_{stnNum:06d}.png"), bbox_inches='tight')
     plt.close()
 
+
 stndf = pd.read_csv(stnfile, parse_dates=[4, 5],
-                    usecols=(1,2,3,4,5,6,7,9,10,12,13,14,16,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49),
-                    names = np.dtype(STNTYPES).names,
+                    usecols=(1, 2, 3, 4, 5, 6, 7, 9, 10, 12, 13, 14, 16,
+                             25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
+                             35, 36, 37, 38, 39, 40, 41, 42, 43, 44,
+                             45, 46, 47, 48, 49),
+                    names=np.dtype(STNTYPES).names,
                     skiprows=1, engine='python', index_col='stnId',
                     converters=STNCONVERT)
 
@@ -197,7 +213,7 @@ for stnNum, obs in tcobsdf.groupby('stnNum'):
         # Assume no multiplier data available
         # Extraction only completed for QLD as at Sept 2022
         continue
-    if len(obs) > 10: # Need a decent number of obs
+    if len(obs) > 10:  # Need a decent number of obs
         print(f"Calculating exceedance probability for {stnNum}")
         obsdf = calcObservedEP(stnNum, obs)
         obsdf.to_csv(pjoin(obsPath, f"ppari_{stnNum:06d}.csv"), index=False)
